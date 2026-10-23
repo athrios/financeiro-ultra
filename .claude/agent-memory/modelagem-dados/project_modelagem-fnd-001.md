@@ -1,6 +1,6 @@
 ---
 name: modelagem-fnd-001
-description: Escolhas de modelagem da FND-001 (02-modelagem-dados.md, rev. 2 em 2026-10-22) que as features futuras devem seguir ou rever
+description: Escolhas de modelagem da FND-001 (02-modelagem-dados.md, rev. 3 em 2026-10-23) que as features futuras devem seguir ou rever
 metadata:
   type: project
 ---
@@ -14,7 +14,8 @@ Entregue em `docs/features/FND-001-fundacao/02-modelagem-dados.md` (gate G1: APT
 - Auditoria: campo `created_at` (clock_timestamp), ação `SETTLE` (não LIQUIDATE, divergência D-04).
 - Comprovantes: limite provisório 4 MiB (Vercel ~4,5 MB a confirmar; proxy Next trunca >10 MB sem erro); hash/tipo só garantidos via route handler (R-D18, enviado à segurança).
 - `partners` mínima na FND: D-01 ACEITA no plano rev. 6.
-- Pendências M-01..M-05 e P-21 seguem abertas; M-01 tem tensão com Brain 09 ("Apurada: motor de rateio executado").
+- Pendências M-01..M-05 e P-21 seguem abertas; M-01: Brain 09 ("Apurada: motor de rateio executado") × Brain 04 Fluxo 3 passo 7 (rateio no registro) — citar os dois lados (D-19).
+- Rev. 3 (2026-10-23): trigger nunca chama `set_audit_context` (is_local vale até o fim da TRANSAÇÃO, não da função); `handle_new_user` lê GUCs, define só os vazios e restaura (I-10b, R-D22).
 
 **Why:** features futuras (Sócios, Rateio, Apuração) partem deste modelo; revisores independentes checam rótulos OFICIAL × PROPOSTA com rigor.
 

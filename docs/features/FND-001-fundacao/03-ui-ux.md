@@ -5,12 +5,12 @@
 | Feature | FND-001 — Fundação |
 | Etapa / gate | E3 · gate G2 |
 | Agente | `design-ui-ux` |
-| Data | 22/10/2026 |
-| Entrada | Plano `01-plano.md` (revisão 6, aprovado em 22/10/2026), seções 4, 5, 6, 14 e handoff da seção 19; Brain 01, 04, 05, 09, 10, 11 e RN-009 a RN-015 (03/07); `02-modelagem-dados.md` (proposta para o G1, consultada na revisão desta rodada); componentes em `src/components/ui` e tela antiga em `src/app` (somente referência) |
+| Data | 22/10/2026 (revisões das rodadas 2 e 3 em 22 e 23/10/2026) |
+| Entrada | Plano `01-plano.md` (revisão 7, de 23/10/2026; aprovado na revisão 6 em 22/10/2026), seções 4, 5, 6, 14 e handoff da seção 19; Brain 01, 04, 05, 09, 10, 11 e RN-009 a RN-015 (03/07); `02-modelagem-dados.md` (proposta para o G1, consultada na revisão desta rodada); componentes em `src/components/ui` e tela antiga em `src/app` (somente referência) |
 | Escopo **implementado pela FND (E5)** | Shell "Financeiro Ultra" com navegação em placeholders, login, `/auth/confirm` e aceite de convite / definir senha, recuperação de senha, estados de acesso (2.7), páginas-placeholder (2.8), estados transversais do shell (carregando, erro, não encontrado, sessão expirada), responsividade e acessibilidade desses itens, e os critérios do QA correspondentes (seção 8.A) |
-| Escopo **só especificado (padrão para features futuras, PROPOSTA)** | Padrão de tabela financeira (2.9), apresentação de Recebido / Devido / Saldo (2.10), padrão de confirmação (5.1), campos monetários (5.3), componentes financeiros (3.3) e critérios UX-23 a UX-41 (seção 8.B). Estão no plano como entrega da especificação (seção 19), **não** como código da E5 e **não** entram nos critérios de aceite da FND (CA-14 a CA-16) sem aprovação do responsável (U-02, seção 9.4) |
+| Escopo **só especificado (padrão para features futuras, PROPOSTA)** | Padrão de tabela financeira (2.9), apresentação de Recebido / Devido / Saldo (2.10), padrão de confirmação (5.1), campos monetários (5.3), componentes financeiros (3.3) e critérios UX-23 a UX-33, UX-35 a UX-41, UX-43, UX-44 e UX-54 (seção 8.B). Estão no plano como entrega da especificação (seção 19), **não** como código da E5 e **não** entram nos critérios de aceite da FND (CA-14 a CA-16) sem aprovação do responsável (U-02, seção 9.4) |
 | Fora do escopo | Telas de features futuras (cadastros, competências, recebimentos, rateio, apuração, compensações, liquidação, importação, OCR, dashboards). Aqui existe apenas o **espaço na navegação** e o **padrão** que elas devem seguir |
-| Status | Revisada (rodada 2, revisão independente); entregue para o gate G2. Ver "Histórico de revisão" ao final |
+| Status | Revisada (rodadas 2 e 3, revisão independente); entregue para o gate G2. Ver "Histórico de revisão" ao final |
 
 ## Convenções deste documento
 
@@ -31,7 +31,7 @@
 - O produto se chama **Financeiro Ultra**. É o único nome exibido: shell, tela de login, `<title>`, e-mails de convite/recuperação (texto do template, a cargo do desenvolvedor) e metadados.
 - "Ultra Contabilidade" (nome do código de 07/10) **não** aparece na interface. Hoje aparece em `src/app/layout.tsx`, `src/app/login/page.tsx` e `src/components/app-header.tsx`; a substituição é da E5.
 - Formato do título de página (PROPOSTA): `{Página} · Financeiro Ultra`. Exemplo: `Recebimentos · Financeiro Ultra`. Login: `Entrar · Financeiro Ultra`.
-- Marca (PROPOSTA): wordmark em texto "Financeiro Ultra" (peso 600) acompanhado de um monograma "FU" em quadrado arredondado na cor `primary`. Não existe arquivo de logotipo; o favicon atual é o padrão do Next. A criação de um logotipo definitivo não faz parte da FND (ver 9.3).
+- Marca (PROPOSTA): wordmark em texto "Financeiro Ultra" (peso 600) acompanhado de um monograma "FU" em quadrado arredondado na cor `primary`. Não existe arquivo de logotipo; o favicon atual é o padrão do Next. A criação de um logotipo definitivo não faz parte da FND (ver 9.3). **Aceito pelo responsável em 23/10/2026 (plano, revisão 7):** o nome "Financeiro Ultra" em texto no lugar do logotipo, até haver um definitivo.
 
 ### 0.2 Vocabulário na interface (RAT-D017 e RAT-D015, OFICIAL)
 
@@ -77,6 +77,8 @@ O tema atual (`src/app/globals.css`) é neutro (cinzas, `--radius` 0,625 rem, Ge
 | Anel de foco | `--ring: oklch(0.708 0 0)` com `ring/50` fica em torno de 1,6:1 a 2,5:1 sobre branco, abaixo dos 3:1 exigidos para indicadores de foco (WCAG 1.4.11). Escurecer para algo próximo de `oklch(0.50 0.12 255)` (≈ 6:1), mantendo o anel de 3 px | PROPOSTA |
 | Espaçamento | Escala do Tailwind já em uso; conteúdo de formulário em `max-w-2xl`, tabelas em largura total do conteúdo | PROPOSTA |
 
+**Aceito pelo responsável em 23/10/2026 (plano, revisão 7):** tokens de cor com contraste reforçado, por acessibilidade. As linhas "Tons semânticos", "Texto secundário" e "Anel de foco" acima deixam de ser apenas PROPOSTA de design: os valores iniciais são o ponto de partida aceito, e o QA mede o contraste real (UX-34) e ajusta os valores se a medição ficar abaixo do mínimo.
+
 Escopo dos tokens: na FND valem os tons `info`, `success`, `warning` e `danger` (usados em avisos, estados de acesso e no aviso de ambiente), o ajuste de `muted-foreground` e o do anel de foco, todos [FND]. O uso do tom em Saldo (âmbar e azul, 2.10.3) é [PADRÃO-FUTURO].
 
 ### 0.6 Escopo: o que a E5 implementa e o que é padrão para features futuras
@@ -109,18 +111,18 @@ Perfis considerados: Administrador, Operador, Visualizador e Sócio (papel com l
 3. Abre `/auth/confirm`. **PROPOSTA:** a primeira abertura mostra uma tela intermediária com o botão "Aceitar convite", e só o clique troca o `token_hash` por sessão. Motivo: verificadores de link de e-mail abrem a URL antes da pessoa e podem consumir o token de uso único. A decisão técnica é do `desenvolvedor` e da `seguranca` (ver 9.4). Alternativa sem tela: verificação automática na abertura.
 4. Com a sessão criada, vai para `/definir-senha` (modo convite).
 5. Define e confirma a senha e conclui. Tela de sucesso com o botão "Ir para o Financeiro Ultra".
-6. Entra na área autenticada. O guarda decide o destino pela **regra única de acesso** (caixa abaixo): perfil ativo → Dashboard; sem perfil ativo → "Acesso ainda não liberado" (2.7.1); papel Sócio → "Acesso de sócio ainda não disponível" (2.7.3).
+6. Entra na área autenticada. O guarda decide o destino pela **regra única de acesso** (caixa abaixo): perfil ativo → Dashboard; sem perfil ativo → "Sem acesso ativo" (2.7.1); papel Sócio → "Acesso de sócio ainda não disponível" (2.7.3).
 
-Ponto de atenção: na FND o papel é definido **depois** do convite (plano, seção 6). É provável que o passo 6 caia em "Acesso ainda não liberado"; a tela trata isso como situação esperada, não como erro, e oferece "Verificar novamente".
+Ponto de atenção: na FND o papel é definido **depois** do convite (plano, seção 6). É provável que o passo 6 caia em "Sem acesso ativo"; a tela trata isso como situação esperada, não como erro, e oferece "Verificar novamente".
 
 > **Regra única de acesso (PROPOSTA, vale para J1, J2, J4, 2.4, 2.7.1, UX-08 e UX-17).** Pessoa **autenticada sem perfil ativo** (sem linha de perfil, `role` nulo ou perfil inativo) **mantém a sessão** e vê sempre a tela 2.7.1 no shell mínimo, qualquer que seja a porta de entrada: login, convite aceito ou navegação interna. A sessão **não** é encerrada nem há mensagem especial no login. Justificativa: (a) o convite aceito antes de o Administrador definir o papel é o caminho normal da FND (plano, seção 6) e precisa de "Verificar novamente" sem novo login; (b) dois tratamentos para a mesma condição fariam "Sair" e entrar de novo mudar o resultado; (c) a sessão sem perfil ativo não lê dado de negócio: na modelagem proposta, `has_role()` e `can_read_business()` exigem `p.active` e um papel, e o usuário sem papel lê apenas o próprio perfil (`02-modelagem-dados.md`, funções de autorização e observações de RLS). Diverge do código atual, em que a Server Action de login encerra a sessão (P-6 em 9.2), e depende da confirmação da `seguranca` (9.4); se ela preferir encerrar a sessão, a regra se inverte **em todos os pontos**, e J1 passo 6 passa a terminar no login com aviso.
 
 ### J2 — Entrada recorrente
 
-1. Abre o endereço; sem sessão, vai para `/login` (o destino pretendido é guardado, apenas rotas internas).
+1. Abre o endereço; sem sessão, vai para `/login` (o destino pretendido é guardado pelo redirecionamento do proxy, só em navegação GET e fora de `/`; no login é revalidado e só vale caminho interno, 4.8).
 2. Informa e-mail e senha e aciona "Entrar".
 3. Credenciais válidas e perfil ativo → vai ao destino pretendido ou ao Dashboard.
-4. Credenciais válidas, mas sem perfil ativo → sessão mantida e tela "Acesso ainda não liberado" (2.7.1), pela regra única de acesso (J1).
+4. Credenciais válidas, mas sem perfil ativo → sessão mantida e tela "Sem acesso ativo" (2.7.1), pela regra única de acesso (J1).
 5. Falha → mensagem acima do formulário; o e-mail permanece preenchido e a senha é limpa.
 
 ### J3 — Recuperação de senha
@@ -145,7 +147,7 @@ Ponto de atenção: na FND o papel é definido **depois** do convite (plano, se�
 ### J6 — Sessão expirada durante o uso
 
 1. Uma navegação ou ação detecta que não há mais sessão.
-2. Vai para `/login` com o aviso "Sua sessão expirou. Entre novamente para continuar." e retorna ao destino após o login. Ações financeiras em andamento **não** são dadas como concluídas (5.1.5).
+2. Vai para `/login` com o aviso "Sua sessão expirou. Entre novamente para continuar." e retorna ao destino após o login (destino interno validado; 4.8 e 4.9). Ações financeiras em andamento **não** são dadas como concluídas (5.1.5).
 
 ### J7 — Ação financeira sensível (padrão, vale para features futuras)
 
@@ -277,7 +279,7 @@ O detalhe por papel de cada módulo é fechado na feature correspondente. A matr
 | Muitas tentativas | `warning` | "Muitas tentativas de entrada. Aguarde alguns minutos e tente novamente." |
 | Falha de rede ou servidor | `danger` | "Não foi possível entrar agora. Tente novamente em instantes." |
 | Credenciais certas, sem perfil ativo | — (sem mensagem no login) | O login **conclui** e a pessoa vai à tela 2.7.1, pela regra única de acesso (J1). A sessão não é encerrada. O texto atual do código ("Procure o financeiro") deixa de existir (9.2, P-6) |
-| Sessão expirada (vindo de J6) | `info` | "Sua sessão expirou. Entre novamente para continuar." |
+| Sessão expirada (vindo de J6; indicador `aviso=sessao-expirada` no redirecionamento do proxy, 4.8) | `info` | "Sua sessão expirou. Entre novamente para continuar." |
 | Senha redefinida / convite concluído e usuário voltou ao login | `success` | "Senha definida. Entre com a nova senha." (usado só se o fluxo terminar sem sessão) |
 
 **Comportamento:** Enter envia; durante o envio, o botão fica desabilitado com o texto "Entrando…" e um indicador; a senha é limpa após falha; o foco permanece no campo de senha; o `Alert` com `role="alert"` anuncia o erro sem mover o foco. Um papel Sócio ativo **entra normalmente** (CA-06: autentica) e cai em 2.7.3; quem não tem perfil ativo entra e cai em 2.7.1.
@@ -309,7 +311,7 @@ Mesma tela para dois modos, trocando apenas título e descrição (o modo vem do
 ### 2.6 Recuperação de senha (`/recuperar-senha`)
 
 - Cartão de auth. `h1` "Recuperar senha"; descrição "Informe o e-mail da sua conta. Enviaremos um link para criar uma nova senha."; campo E-mail; botão "Enviar link"; link "Voltar para o login".
-- **Resposta única** (sem enumeração): após o envio, o formulário é substituído por um estado de sucesso com ícone de e-mail, título "Verifique seu e-mail" e texto "Se houver uma conta para {e-mail}, enviamos um link para criar uma nova senha. Se não encontrar a mensagem, confira a caixa de spam." O prazo de validade do link é a expiração do link/OTP de e-mail **configurada no Supabase Auth** (passo de painel da E9, a cargo do `desenvolvedor` e do responsável) e deve ser escrito no texto quando for conhecido; não inventar um número. A P-25 (SMTP e domínio) define apenas o remetente e o domínio, não o prazo.
+- **Resposta única** (sem enumeração): após o envio, o formulário é substituído por um estado de sucesso com ícone de e-mail, título "Verifique seu e-mail" e texto "Se houver uma conta para {e-mail}, enviamos um link para criar uma nova senha. Se não encontrar a mensagem, confira a caixa de spam." O prazo de validade do link é a expiração do link/OTP de e-mail **configurada no Supabase Auth** (configurada pelo responsável na E9, a partir do checklist de painéis entregue na E8) e deve ser escrito no texto quando for conhecido; não inventar um número. A P-25 (SMTP e domínio) define apenas o remetente e o domínio, não o prazo.
 - Reenvio: botão "Enviar novamente" desabilitado durante o intervalo de espera, com contagem regressiva em texto ("disponível em 45 s") sem anunciar a cada segundo (anunciar no início e ao liberar).
 - Erro de limite: "Muitas solicitações. Aguarde alguns minutos e tente novamente." (`warning`). Erro de rede: "Não foi possível enviar agora. Tente novamente em instantes." (`danger`).
 - Dependência externa: até o SMTP próprio existir (P-25), o envio no ambiente hospedado é limitado; a tela não muda.
@@ -320,9 +322,9 @@ Estes estados valem para **qualquer** rota de `(app)` e usam o **shell mínimo**
 
 **2.7.1 Acesso não configurado (autenticado, sem perfil ativo: sem perfil, `role` nulo ou perfil inativo)**
 
-- Ícone `shield-alert`, tom `warning`. Título "Acesso ainda não liberado". Texto: "Sua conta {e-mail} foi autenticada, mas ainda não tem acesso ativo ao Financeiro Ultra. Peça a um Administrador para liberar o seu acesso."
+- Ícone `shield-alert`, tom `warning`. Título "Sem acesso ativo". Texto: "Sua conta {e-mail} foi autenticada, mas não tem acesso ativo ao Financeiro Ultra. Se você esperava ter acesso, peça a um Administrador para verificar o seu cadastro." (texto neutro, sem "ainda não": serve tanto a quem aguarda a liberação do papel quanto a quem foi desativado de propósito)
 - Ações: **Verificar novamente** (recarrega o perfil, sem exigir novo login) e **Sair**.
-- A mesma mensagem cobre perfil inexistente, `role` nulo e perfil inativo, para não revelar diferenças de configuração. Na modelagem proposta, o estado "sem vínculo" do plano corresponde a `role` nulo (`02-modelagem-dados.md`: "`role is null` → 'sem vínculo'"), portanto já está coberto por esta tela; não há tela separada.
+- A mesma mensagem cobre perfil inexistente, `role` nulo e perfil inativo, para não revelar diferenças de configuração. **Divergência registrada (9.2, P-10):** a modelagem proposta distingue "sem vínculo" (`role is null`) de "bloqueado" (`active = false`) e o CA-08 fala em "bloqueio de usuário inativo"; esta spec funde os dois numa única tela por sigilo, e a decisão final é da `seguranca`, junto com a regra única de acesso. Na modelagem proposta, o estado "sem vínculo" do plano corresponde a `role` nulo (`02-modelagem-dados.md`: "`role is null` → 'sem vínculo'"), portanto já está coberto por esta tela; não há tela separada.
 - Alcançável por: convite aceito antes de o Administrador definir o papel (J1), login de conta sem perfil ativo (J2) e perfil desativado durante uma sessão aberta (J4). Mesma regra em todos (regra única de acesso, J1).
 
 **2.7.2 Sócio sem vínculo com cadastro de sócio — CONDICIONAL ao G1 (não entra no UX-16)**
@@ -620,15 +622,18 @@ Dois casos distintos, com mecanismos diferentes no Next 16.4 instalado. Fonte: `
 | Caso | Quando | Arquivo | Moldura | Texto e ação |
 |---|---|---|---|---|
 | (a) Registro ou segmento inexistente dentro de `(app)` | A página chama `notFound()` (registro que não existe, ou que o RLS esconde da pessoa) | `app/(app)/not-found.tsx` | **Dentro do shell** (a pessoa já passou pela guarda de sessão e perfil de `(app)`) | Ícone `file-search`, título "Registro não encontrado", texto "O registro não existe ou o conteúdo não está disponível para você." (cobre também o RLS, sem revelar existência). Ação: "Voltar ao Dashboard" |
-| (b) URL que não corresponde a nenhuma rota | Endereço digitado errado, link antigo | `app/not-found.tsx` (raiz) | **Sem shell** e **sem guarda de sessão**: renderizado dentro do layout raiz, não do layout de `(app)`. Mostra a marca "Financeiro Ultra" em página mínima, como o `global-error.tsx` | Ícone `file-search`, título "Página não encontrada", texto "O endereço não existe ou foi removido." Ação: "Ir para o início" (leva a `/`; sem sessão, a guarda de `(app)` redireciona ao login). Não consulta dados nem mostra nome ou papel do usuário |
+| (b) URL que não corresponde a nenhuma rota, **com sessão** | Endereço digitado errado, link antigo | `app/not-found.tsx` (raiz) | **Sem shell**: renderizado dentro do layout raiz, não do layout de `(app)`, e sem lógica de sessão própria. Mostra a marca "Financeiro Ultra" em página mínima, como o `global-error.tsx` | Ícone `file-search`, título "Página não encontrada", texto "O endereço não existe ou foi removido." Ação: "Ir para o início" (leva a `/`). Não consulta dados nem mostra nome ou papel do usuário |
 
 - O arquivo raiz `app/not-found.tsx` não deve depender de sessão, perfil nem do shell; o layout raiz segue sem lógica de sessão. `global-not-found.js` é experimental e dispensado: há um único layout raiz.
+- **Sem sessão, a 404 de URL não aparece (decisão desta revisão; saída 1 da revisão independente).** O proxy da aplicação (`src/proxy.ts` e `src/lib/supabase/proxy.ts`, mantido pelo plano, seção 6: "o proxy renova cookies, checagem otimista") roda em todas as rotas, exceto assets estáticos, e manda ao `/login` todo visitante sem sessão que não esteja na lista de rotas públicas (hoje só `/login`). Portanto, sem sessão, `/rota-que-nao-existe` vai ao login, e o destino pretendido é guardado (J2). Isso é intencional: um visitante anônimo não precisa aprender quais endereços existem, e a spec **não** pede mudança do proxy para a 404 em si.
+- **Redirecionamento do proxy como requisito de J2, J6 e 4.9 (observação baixa da rodada 3; conferido em `src/lib/supabase/proxy.ts` e `src/lib/safe-redirect.ts`).** O destino guardado e o aviso de sessão expirada dependem de o redirecionamento do proxy levar essas informações; por isso são **requisito**, não detalhe de implementação: (a) sem sessão, o proxy redireciona ao `/login` com o destino pretendido (`?next=<caminho interno>`) **somente em navegação GET e nunca quando o destino é `/`**; em ação não GET e em `/`, vai ao `/login` sem destino; (b) quando havia credencial de sessão vencida, o redirecionamento leva também o indicador de sessão expirada (`?aviso=sessao-expirada`), que o login traduz no aviso `info` de 2.4 e 4.9; sem credencial prévia (visitante novo), não há aviso; (c) o login **revalida** o destino antes de usá-lo: só aceita caminho interno da própria aplicação, protegido contra redirecionamento aberto (sem esquema, sem host, sem `//`, sem barra invertida, sem caracteres de controle, tamanho limitado), e recusa as rotas de autenticação como destino (evita laço); destino inválido ou ausente cai em `/` (Dashboard). O que a E5 ajusta no proxy continua sendo apenas a lista de rotas públicas (abaixo). Uma lista de rotas públicas não permitiria liberar só as "URLs desconhecidas" sem deixar passar as demais. Depois do login, se o destino guardado não existir, a pessoa vê a 404 do caso (b), com a ação "Ir para o início".
+- **Rotas públicas que o proxy precisa conhecer (E5, 9.4 item 5):** pelo mapa de 2.1, `/login`, `/recuperar-senha` e `/auth/confirm` devem ser alcançáveis sem sessão. Hoje o proxy só libera `/login` e, para quem tem sessão, redireciona as rotas públicas para `/`. A E5 ajusta a lista (o comportamento do destino e do aviso acima é requisito, já presente no proxy da E5); `/definir-senha` **não** é pública (exige a sessão criada por `/auth/confirm`).
 - Uma rota inexistente **não** aparece dentro do shell, porque `app/(app)/not-found.tsx` só captura `notFound()` lançado em `(app)`.
 - O "Registro que o RLS esconde" de 2.7.4 usa o caso (a).
 
 ### 4.9 Sessão expirada
 
-Redireciona ao login com o aviso `info` de 2.4. Nunca exibe estado de sucesso de ação que não foi confirmada pelo servidor.
+Redireciona ao login com o aviso `info` de 2.4, mostrado quando o redirecionamento do proxy traz o indicador de sessão expirada (4.8), e depois do login retorna ao destino pretendido, desde que seja um caminho interno validado (4.8, item (c)); caso contrário, vai ao Dashboard. Nunca exibe estado de sucesso de ação que não foi confirmada pelo servidor.
 
 ### 4.10 Resumo dos estados por tela da FND
 
@@ -640,7 +645,7 @@ Redireciona ao login com o aviso `info` de 2.4. Nunca exibe estado de sucesso de
 | Definir senha | formulário | botão "Salvando…" | — | regras, senhas diferentes, sessão ausente | "Senha definida" | — | — |
 | Acesso (2.7) | estado informativo | verificação em andamento | — | falha ao verificar | acesso liberado → entra | sem perfil ativo (2.7.1) / Sócio sem escopo (2.7.3) | sem permissão (2.7.4) |
 | Dashboard / módulos | placeholder | esqueleto | placeholder | `ErrorPanel` / `error.tsx` | — | — | sem permissão |
-| Não encontrado | registro: no shell (4.8a); URL: página mínima com a marca (4.8b) | — | — | — | — | — | — |
+| Não encontrado | registro: no shell (4.8a); URL com sessão: página mínima com a marca (4.8b); URL sem sessão: vai ao login (proxy) | — | — | — | — | — | — |
 
 ---
 
@@ -835,7 +840,7 @@ Cada item é verificável por inspeção, teste manual guiado ou teste automatiz
 | UX-18 | Os estados de acesso não exibem nomes de sócios nem dados de negócio | M |
 | UX-19 | Cada módulo do menu abre a página-placeholder com `h1` do módulo; o selo "Em breve" aparece no menu | A |
 | UX-20 | Existe `loading.tsx` e `error.tsx` (dentro do shell, grupo `(app)`), `global-error.tsx` (sem shell), `app/not-found.tsx` raiz (sem shell) e `app/(app)/not-found.tsx` (no shell); o erro inesperado mostra código de suporte e nunca stack, SQLSTATE ou nome de tabela | M |
-| UX-21 | (a) Em URL que não corresponde a nenhuma rota (por exemplo `/rota-que-nao-existe`), aparece "Página não encontrada" **sem shell** e sem nome ou papel do usuário, também sem sessão, com ação "Ir para o início". (b) Quando uma página de `(app)` chama `notFound()` (registro inexistente ou oculto pelo RLS), aparece "Registro não encontrado" **dentro do shell**, sem revelar a existência (4.8). A FND não tem página de registro: o item (b) é verificado por teste do próprio arquivo/rota de teste do `desenvolvedor` e passa a ser verificado de fato na primeira feature com registros | M |
+| UX-21 | (a) Em URL que não corresponde a nenhuma rota (por exemplo `/rota-que-nao-existe`), **com sessão**, aparece "Página não encontrada" **sem shell** e sem nome ou papel do usuário, com ação "Ir para o início". **Sem sessão**, a mesma URL leva ao `/login` (o proxy redireciona antes de qualquer rota; 4.8), e isso **não** reprova o critério. (b) Quando uma página de `(app)` chama `notFound()` (registro inexistente ou oculto pelo RLS), aparece "Registro não encontrado" **dentro do shell**, sem revelar a existência (4.8). A FND não tem página de registro: o item (b) é verificado por teste do próprio arquivo/rota de teste do `desenvolvedor` e passa a ser verificado de fato na primeira feature com registros | M |
 | UX-22 | O esqueleto não aparece em respostas rápidas (< 300 ms) e, quando aparece, mantém o shell estável (sem salto de layout) | M |
 
 ### Responsividade e acessibilidade (shell e telas da FND)
@@ -902,6 +907,8 @@ Mapa para o plano (FND): CA-14 → UX-01 a UX-05, UX-16 a UX-22, UX-34, UX-42, U
 
 ### 9.1 Divergências encontradas no Brain (reportadas, não corrigidas — o Brain não é editado por este agente)
 
+Estado: D-1 a D-5 **anotadas no Brain** (notas de 22/10/2026 em 00, 01, 05 e 10); D-6, D-7 e D-8 **abertas**.
+
 | # | Onde | Divergência | Efeito nesta spec |
 |---|---|---|---|
 | D-1 | `05-Modulos.md`, Configurações | Lista "Partes" e "Regras de divisão" como submódulos. RAT-D017 troca Parte por Sócio, e RAT-D015 elimina regras de divisão configuráveis | Menu usa "Sócios" e **não** tem "Regras de divisão" |
@@ -926,8 +933,10 @@ Mapa para o plano (FND): CA-14 → UX-01 a UX-05, UX-16 a UX-22, UX-34, UX-42, U
 | P-7 | Seção 15, CA-14 | CA-14 pede "estados conforme `03-ui-ux.md`": cobertos em 4 e 8.A (UX-16 a UX-22) |
 | P-8 | Seção 14 (E5), 15 (CA-14) e 19 | A E5 implementa "layout autenticado com navegação (placeholders), rota `/auth/confirm` e página de definir/redefinir senha". O plano pede a esta spec o **padrão** de tabela financeira, Recebido / Devido / Saldo e confirmação (seção 19), mas **não** prevê código desses padrões na FND. Esta revisão separa os dois (0.6, 3.2 × 3.3, 8.A × 8.B) e lista os padrões como PROPOSTA fora dos CA. Ampliar a E5 exige aprovação (U-02) |
 | P-9 | Seção 6 (matriz) | As linhas "Gerenciar clientes", "Lançar recebimentos e importar comprovantes" e "Leitura geral" são P-02b para o Sócio. A tabela de 2.3 usa "P-02b (FND: oculto)" nelas, para não tratar a pendência como regra fechada |
+| P-10 | Seção 6 / CA-08 × `02-modelagem-dados.md`, 8.1 | A modelagem distingue "sem vínculo" (`role is null`) de "bloqueado" (`active = false`), e o CA-08 fala em "bloqueio de usuário inativo". Esta spec **funde** os dois numa única tela, 2.7.1 ("Sem acesso ativo"), por sigilo (não revelar diferenças de configuração), com texto neutro que serve aos dois casos. Decisão final da `seguranca`, junto com a regra única de acesso (J1); se ela preferir telas separadas, 2.7.1 se divide em "Sem acesso ativo" (sem vínculo) e "Acesso desativado" (bloqueado), com UX-16 ampliado |
+| P-11 | Seção 6 (`proxy`) e `src/lib/supabase/proxy.ts` | O proxy redireciona ao `/login` todo visitante sem sessão fora de `PUBLIC_PATHS` (hoje só `/login`). A 404 de URL só aparece com sessão (4.8, UX-21), e a lista precisa incluir `/recuperar-senha` e `/auth/confirm` (9.4, item 5). O redirecionamento do proxy também é requisito de J2, J6 e 4.9: leva o destino pretendido (`next`, só navegação GET e fora de `/`) e, havendo credencial de sessão vencida, o indicador de sessão expirada (`aviso`); o login revalida o destino (só caminho interno, protegido contra redirecionamento aberto; destino inválido cai em `/`) (4.8). A spec não pede mudança do desenho do proxy além da lista de rotas públicas |
 
-Nenhuma divergência impede o gate; D-1 a D-5 pedem anotação do Brain por quem o mantém.
+Situação em 23/10/2026: **D-1 a D-5 já estão anotadas no Brain**, nas notas de 22/10/2026 de `00-MOC.md` (D-5), `01-Visao-Geral.md` (D-5), `05-Modulos.md` (D-1, D-2 e D-3: o cadastro de Recebedores consta como pendência de UI, que segue aberta na U-01) e `10-Seguranca-e-Auditoria.md` (D-4); o plano, revisão 6, registra essas notas. Não há anotação a pedir. Seguem **abertas** D-6, D-7 e D-8. Nenhuma divergência impede o gate.
 
 ### 9.3 Fora do escopo da FND (registrado para não se perder)
 
@@ -945,10 +954,10 @@ Nenhuma divergência impede o gate; D-1 a D-5 pedem anotação do Brain por quem
 1. **P-02b** — O que o sócio vê e faz com o login próprio. Até lá, 2.7.3 (nenhum módulo, nenhum dado) e "P-02b (FND: oculto)" na tabela de 2.3.
 2. **P-08** (enunciado original do plano e do Brain 11: "Recebedor é sempre um Sócio ou pode haver intermediário?") — dependência da U-01 abaixo. Esta spec não a reinterpreta.
 3. **U-01 (pendência própria da UI, depende da P-08)** — Onde mora o cadastro de Recebedores na navegação. Recomendação: dentro de Configurações > Sócios, junto da primeira feature do roadmap ("Sócios, recebedores e aliases"); a FND só reserva a posição.
-4. **U-02 (pendência própria da UI)** — Ampliar a E5 para implementar os padrões [PADRÃO-FUTURO] (componentes financeiros, confirmação, componentes de exemplo)? Recomendação: **não**; a FND fica com o shell, a autenticação, os estados de acesso e os placeholders, e os padrões são implementados na primeira feature que os usar. Se o responsável aprovar a ampliação, os critérios UX-23 a UX-41, UX-43, UX-44 e UX-54 passam a ser verificados na FND e o plano (CA-14 / CA-16, seção 14) precisa ser revisado por quem o mantém.
+4. **U-02 (pendência própria da UI)** — Ampliar a E5 para implementar os padrões [PADRÃO-FUTURO] (componentes financeiros, confirmação, componentes de exemplo)? Recomendação: **não**; a FND fica com o shell, a autenticação, os estados de acesso e os placeholders, e os padrões são implementados na primeira feature que os usar. Se o responsável aprovar a ampliação, os critérios UX-23 a UX-33, UX-35 a UX-41, UX-43, UX-44 e UX-54 passam a ser verificados na FND e o plano (CA-14 / CA-16, seção 14) precisa ser revisado por quem o mantém.
 5. **P-14** — MFA para administradores: se aprovado, o login ganha uma etapa de código (não desenhada aqui).
 6. **P-19** — Fuso oficial das datas e da competência (esta spec adota `America/Sao_Paulo` como recomendação).
-7. **P-25** — Provedor de SMTP e domínio: define apenas o **remetente** e o domínio dos e-mails. O **prazo de validade dos links** de convite e recuperação é configuração do Supabase Auth (expiração do link/OTP de e-mail), tratada nos passos de painel da E9 (ver o handoff ao `desenvolvedor`, item 8).
+7. **P-25** — Provedor de SMTP e domínio: define apenas o **remetente** e o domínio dos e-mails. O **prazo de validade dos links** de convite e recuperação é configuração do Supabase Auth (expiração do link/OTP de e-mail), configurada pelo responsável nos painéis da E9 (checklist da E8; ver o handoff ao `desenvolvedor`, item 8).
 
 **Ao `desenvolvedor` (E5):**
 
@@ -956,16 +965,16 @@ Nenhuma divergência impede o gate; D-1 a D-5 pedem anotação do Brain por quem
 2. Decidir, com a `seguranca`, a tela intermediária de aceite (J1) e a política de senha (comprimento e regras), expondo a regra para a UI exibir antes do erro.
 3. Confirmar se o e-mail de recuperação funciona para usuário convidado que ainda não definiu senha; se não, o texto de 4.6 precisa orientar o pedido de novo convite.
 4. Implementar a **regra única de acesso** (J1): autenticado sem perfil ativo mantém a sessão e vê 2.7.1, também no login (hoje a Server Action de login encerra a sessão; P-6). Se a `seguranca` decidir o contrário, inverter a regra em todos os pontos.
-5. Criar `app/not-found.tsx` (raiz, sem shell e sem sessão, 4.8b) e `app/(app)/not-found.tsx` (no shell, 4.8a). Conferir o comportamento contra `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/not-found.md` da versão instalada.
+5. Criar `app/not-found.tsx` (raiz, sem shell e sem lógica de sessão própria; só é vista com sessão, 4.8b) e `app/(app)/not-found.tsx` (no shell, 4.8a). **Proxy:** manter o redirecionamento ao `/login` de quem não tem sessão **levando o destino pretendido e o indicador de sessão expirada**, como requisito (a 404 de URL sem sessão cai no login, 4.8): `next` com o caminho interno só em navegação GET e nunca para `/`; `aviso=sessao-expirada` só quando havia credencial vencida; o login revalida `next` (somente caminho interno, protegido contra redirecionamento aberto, rotas de autenticação recusadas, inválido cai em `/`). Acrescentar à lista de rotas públicas do proxy `/recuperar-senha` e `/auth/confirm`, além de `/login` (2.1). Verificar com a `seguranca` o comportamento para quem já tem sessão e abre essas rotas: hoje as rotas públicas redirecionam para `/`, o que não pode impedir o aceite de convite nem a recuperação. Conferir o comportamento contra `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/not-found.md` da versão instalada.
 6. Escolher entre renderizar o estado "Sem permissão" na página ou habilitar `forbidden()` (experimental no Next 16.4; ver `forbidden.md` na documentação local).
 7. Os ícones lucide citados nesta spec (incluindo os da tabela 2.3) foram conferidos na versão instalada do `lucide-react` (1.52.0). A propriedade `focusableWhenDisabled` consta nas definições de tipo do Button do Base UI instalado (1.8.0); conferir o comportamento em uso (relevante só para as features, [PADRÃO-FUTURO]).
-8. Nos passos de painel da E9, configurar a expiração do link/OTP de e-mail do Supabase Auth e informá-la à UI para os textos de 2.5 e 2.6 (não é da P-25).
+8. Incluir no checklist de painéis da E8 a expiração do link/OTP de e-mail do Supabase Auth. O responsável a configura na E9 (plano, seções 10 e 19: os passos de painel são dele) e o valor é informado à UI para os textos de 2.5 e 2.6 (não é da P-25).
 
 **Handoff às features futuras ([PADRÃO-FUTURO], não é da E5):** na feature de Apuração, fornecer ao domínio `balanceDirection` (sinal → `transfer` | `receive` | `settled`) com teste, e `formatSignedCurrency` (sinal explícito e U+2212) em `lib/format`; os componentes só consomem. Nas features com ações de confirmação, garantir idempotência no servidor (a UI previne duplo envio, mas não substitui isso).
 
 **À `modelagem-dados` (E2):** resposta já proposta no `02-modelagem-dados.md` (`PARTNER` exige `partner_id`; `role` nulo = "sem vínculo"); falta a aprovação do G1, que define se 2.7.2 existe. P-17 (registro do resíduo) alimenta a nota do centavo de ajuste e a decisão pendente sobre "diferença controlada" (D-7).
 
-**À `seguranca` (E8b):** revisar mensagens de login (sem enumeração), tela intermediária de aceite, política de senha, a regra de "não mostrar nome de sócio" nos estados de acesso do papel Sócio e a **regra única de acesso** (manter a sessão sem perfil ativo, J1).
+**À `seguranca` (E8b):** revisar mensagens de login (sem enumeração), tela intermediária de aceite, política de senha, a regra de "não mostrar nome de sócio" nos estados de acesso do papel Sócio e a **regra única de acesso** (manter a sessão sem perfil ativo, J1), incluindo a **fusão de "sem vínculo" e "bloqueado"** numa só tela por sigilo (P-10) o comportamento do proxy para quem já tem sessão e abre rotas públicas (9.4, item 5; P-11) e a **validação do destino do redirecionamento** (`next`: só caminho interno, sem redirecionamento aberto, sem laço por rotas de autenticação, descarte em ação não GET; `aviso` sem vazar informação de conta) (4.8, 9.4 item 5).
 
 **Ao `qa` (E10):** executar a seção **8.A** como parte da matriz de CA-14 (CA-08, CA-06 e CA-16 nas partes de UI indicadas); incluir contraste medido (UX-34) e teste com leitor de tela (UX-49). A seção 8.B **não** entra na matriz da FND, salvo aprovação da U-02.
 
@@ -988,6 +997,26 @@ Condições para a E5: o `desenvolvedor` seguirá as seções 2 a 7 (itens [FND]
 ---
 
 ## Histórico de revisão
+
+### Rodada 3, complemento (23/10/2026): observação nova da revisão independente (baixa), sobre o redirecionamento do proxy
+
+A nota da 4.8 dizia que o destino pretendido é guardado (J2), mas também que a spec "não pede mudança do proxy"; o item 5 do 9.4 mandava "manter o redirecionamento" e P-11 dizia não haver mudança "além da lista", sem deixar claro que J2, J6 e 4.9 exigem que o redirecionamento leve o destino e o motivo. **Corrigido** em 4.8 (novo requisito, itens a a c, conferido no código de `src/lib/supabase/proxy.ts` e `src/lib/safe-redirect.ts`), 4.9, 2.4 (linha da sessão expirada), J2, J6, 9.2 (P-11) e 9.4 (item 5 e handoff à `seguranca`, que passou a revisar a validação do destino). Nenhuma outra decisão mudou, nenhuma proposta virou decisão; só este arquivo foi alterado.
+
+### Rodada 3 (23/10/2026): observações restantes da revisão independente (`round3-03-findings`, veredito "consistente com ressalvas"), antes da E5
+
+As 5 observações foram tratadas; nenhuma foi rejeitada. Nenhuma pendência parcial anterior ficou aberta. Não houve alteração de regra financeira, do Brain nem do plano `01-plano.md`; só este arquivo mudou.
+
+| # | Observação | Severidade | Tratamento | Onde |
+|---|---|---|---|---|
+| 1 | UX-21(a) e 4.8(b) exigiam a 404 de URL "sem sessão", mas o proxy (`src/proxy.ts`, `src/lib/supabase/proxy.ts`; `PUBLIC_PATHS = ["/login"]`, matcher que cobre todas as rotas, exceto assets) redireciona ao `/login` todo visitante sem sessão antes de qualquer rota | média | **Corrigido pela saída 1 da revisão**, conferida no código do proxy: sem sessão, URL inexistente vai ao login; com sessão, aparece a 404 raiz, sem shell. Removido "sem guarda de sessão" e "também sem sessão"; UX-21 e 4.10 distinguem os dois casos e deixam claro que o login sem sessão não reprova o critério. Não se pede mudança do desenho do proxy (a saída 2 dependeria da `seguranca` e a lista de rotas públicas não separa "URL desconhecida" das demais). Handoff da E5 (9.4, item 5) ganhou a lista de rotas públicas do proxy (`/login`, `/recuperar-senha`, `/auth/confirm`) e a verificação, com a `seguranca`, do redirecionamento de quem já tem sessão. Registrado em P-11 | 4.8, 4.10, UX-21, 9.2 (P-11), 9.4 |
+| 2 | Handoff 9.4 (item 8) e 2.6 atribuíam ao `desenvolvedor` os passos de painel da E9, que o plano dá ao responsável (E9 e seção 19) | baixa | **Corrigido.** O item 8 passou a: incluir a expiração do link/OTP de e-mail no checklist de painéis da E8; o responsável a configura na E9; o valor é informado à UI. 2.6 e a pendência P-25 (9.4, item 7) alinhadas | 2.6, 9.4 (itens 7 e 8) |
+| 3 | O cabeçalho e 9.4 (item 4, U-02) citavam "UX-23 a UX-41", faixa que inclui o UX-34, critério da FND | baixa | **Corrigido.** Nas duas passagens: "UX-23 a UX-33, UX-35 a UX-41, UX-43, UX-44 e UX-54", igual à introdução da seção 8 | Cabeçalho, 9.4 (item 4) |
+| 4 | 9.1 e a frase final de 9.2 pediam anotação no Brain para D-1 a D-5, já feita nas notas de 22/10/2026 (00, 01, 05, 10) | baixa | **Corrigido**, após conferir as notas no Brain. D-1 a D-5 marcadas como anotadas; removido o pedido de anotação; D-6, D-7 e D-8 permanecem abertas. A posição do cadastro de Recebedores segue pendente como U-01 | 9.1 |
+| 5 | A regra única de acesso funde perfil inexistente, `role` nulo e perfil **inativo** numa tela com "ainda não liberado", sem registrar a divergência com a modelagem (8.1) nem com o "bloqueio de usuário inativo" do CA-08 | baixa | **Corrigido pelas duas vias sugeridas.** (a) Divergência registrada em P-10 (9.2) e no handoff à `seguranca` (9.4), que decide junto com a regra única de acesso; (b) texto neutro na tela 2.7.1: título "Sem acesso ativo" e "…não tem acesso ativo ao Financeiro Ultra. Se você esperava ter acesso, peça a um Administrador para verificar o seu cadastro.", que serve a quem aguarda a liberação e a quem foi desativado. Referências em J1 e J2 atualizadas | J1, J2, 2.7.1, 9.2 (P-10), 9.4 |
+
+Decisões do responsável registradas (plano, revisão 7, 23/10/2026): ficam **aceitos**, sem objeção, (1) tokens de cor com contraste reforçado, por acessibilidade, e (2) o nome "Financeiro Ultra" em texto no lugar do logotipo, até haver um definitivo. Refletido em 0.1 e 0.5; a criação de logotipo continua fora da FND (9.3). Nenhum item do contrato visual muda além disso.
+
+Pendências que seguem para quem mantém os documentos: P-10 (fusão "sem vínculo" × "bloqueado", `seguranca`), P-11 (lista de rotas públicas do proxy e comportamento com sessão, E5 e `seguranca`), além das já listadas na rodada 2.
 
 ### Rodada 2 (22/10/2026): revisão independente (`round2-03-findings`, veredito "consistente com ressalvas")
 

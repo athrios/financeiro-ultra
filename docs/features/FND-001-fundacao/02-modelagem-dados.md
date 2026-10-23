@@ -5,10 +5,10 @@
 | Feature | FND-001 — Fundação |
 | Etapa / gate | E2 / G1 |
 | Agente | `modelagem-dados` |
-| Data | 22/10/2026 |
-| Entrada | `01-plano.md` (revisão 6; aprovado em 22/10/2026, com o ajuste D-01 aceito); Brain 00, 02, 03, 04, 05, 06, 07, 08, 09, 10 e 11 (com as notas de revisão de 22/10); `supabase/migrations/20261007000100` a `0700` (só como referência de padrões); `src/domain/shared` e `src/domain/distribution` (primitivas) |
+| Data | 22/10/2026 (revisão 3 em 23/10/2026) |
+| Entrada | `01-plano.md` (revisão 7; aprovado em 22/10/2026, com o ajuste D-01 aceito; a revisão 7 só muda a sequência E4/E5 e não altera este modelo); Brain 00, 02, 03, 04, 05, 06, 07, 08, 09, 10 e 11 (com as notas de revisão de 22/10); `supabase/migrations/20261007000100` a `0700` (só como referência de padrões); `src/domain/shared` e `src/domain/distribution` (primitivas) |
 | Escopo da DDL | **Somente o transversal da FND**: papéis e perfis (com `partner_id` opcional), tabela mínima `partners` (exigida pela FK), auditoria estendida, `proof_files` e bucket de comprovantes. Nenhuma DDL de rateio, cliente, competência ou recebimento |
-| Status | Proposta para o gate G1, **revisão 2** (correções da revisão independente; ver "Histórico de revisão" ao final). Nenhuma migration foi criada e nenhum código foi alterado (a implementação é a E4/E7) |
+| Status | Proposta para o gate G1, **revisão 3** (correções da segunda rodada da revisão independente; ver "Histórico de revisão" ao final). Nenhuma migration foi criada e nenhum código foi alterado (a implementação é a E4/E7) |
 
 ## Como ler as classificações
 
@@ -596,6 +596,7 @@ Notas:
 - O nome do campo de horário é `created_at`, como no plano 9; a diferença para 07/10 é só o padrão (`clock_timestamp()` em vez de `now()`), que dá um horário por evento e não um por transação. [PROPOSTA]
 - A ação semântica de liquidação chama-se `SETTLE` (o plano 9 cita `LIQUIDATE` numa lista exemplificativa). Motivo: mesmo radical do estado `SETTLED` e da tabela `competence_settlements`, para que código, enum e auditoria usem um termo só. Registrado em D-04. [PROPOSTA]
 - O valor `DIRECT` (alteração por SQL sem contexto, ex.: editor do painel) amplia a lista do plano 9 (ui/importação/sistema/script) para que nenhuma escrita fique sem origem. [PROPOSTA]
+- **Quem define o contexto.** Só o ponto de entrada da operação chama `private.set_audit_context`: a RPC chamada pelo cliente, o procedimento (`bootstrap_first_admin`, `set_user_access`) ou o script. Função disparada por **trigger** nunca chama `set_audit_context`, porque ele redefine os quatro GUCs da transação inteira (`is_local = true` vale até o fim da transação, não até o fim da função) e apagaria o motivo, a origem, a correlação e o rótulo de quem chamou. Se o trigger precisar de origem própria quando não há contexto, ele lê os GUCs, define só os vazios e restaura os valores anteriores logo depois da escrita, como `private.handle_new_user` (3.3). Teste em 12.2 ("Auditoria"). [PROPOSTA]
 - Encadeamento por hash e retenção: [PENDENTE] P-18. O modelo permite acrescentar `prev_hash`/`row_hash` depois, calculados na ordem de `seq` (backfill determinístico, porque a tabela é append-only).
 - `request.headers` e `request.jwt.claims` são GUCs que o PostgREST define por requisição; o comportamento com o cabeçalho `x-correlation-id` deve ser confirmado em teste de integração na E4 (não só em pgTAP).
 
@@ -654,14 +655,37 @@ create trigger profiles_audit after insert or update or delete on public.profile
 alter table public.profiles enable row level security;
 
 -- Perfil criado automaticamente, SEM papel (corrige F-01).
+-- Regra (3.2, "Notas"): função chamada por trigger NÃO sobrescreve o contexto de auditoria
+-- da transação. Ela não chama private.set_audit_context (que redefine os quatro GUCs).
+--   * Sem contexto (transação do GoTrue, sem JWT): o CREATE do perfil sai com
+--     source = SYSTEM e actor_label = 'supabase-auth' (senão a auditoria marcaria DIRECT).
+--   * Com contexto já definido (script, seed, pgTAP, editor SQL): o CREATE herda o do chamador.
+--   * Motivo (app.audit_reason) e correlação (app.correlation_id) nunca são tocados.
+--   * Origem e rótulo voltam ao valor anterior logo depois do INSERT: nada vaza para as
+--     escritas seguintes da mesma transação.
+-- O trigger profiles_audit é AFTER ROW comum (não diferido): dispara ao fim do INSERT abaixo,
+-- antes da restauração. Se um dia virar constraint trigger diferido, esta função precisa mudar.
+-- Se o INSERT falhar dentro de um savepoint, o rollback do savepoint desfaz também os set_config.
 create function private.handle_new_user()
 returns trigger language plpgsql security definer set search_path = '' as $$
+declare
+  v_prev_source text := coalesce(current_setting('app.audit_source', true), '');
+  v_prev_label  text := coalesce(current_setting('app.audit_actor_label', true), '');
 begin
-  -- Executa na transação do GoTrue (sem JWT): sem isto, a auditoria marcaria DIRECT.
-  perform private.set_audit_context(null, 'SYSTEM', null, 'supabase-auth');
+  if v_prev_source = '' then
+    perform pg_catalog.set_config('app.audit_source', 'SYSTEM', true);
+    if v_prev_label = '' then
+      perform pg_catalog.set_config('app.audit_actor_label', 'supabase-auth', true);
+    end if;
+  end if;
+
   insert into public.profiles (id, full_name)
   values (new.id, nullif(pg_catalog.btrim(new.raw_user_meta_data ->> 'full_name'), ''))
   on conflict (id) do nothing;
+
+  -- Restaura exatamente o que havia antes ('' = sem contexto; os leitores usam nullif).
+  perform pg_catalog.set_config('app.audit_source',      v_prev_source, true);
+  perform pg_catalog.set_config('app.audit_actor_label', v_prev_label,  true);
   return new;
 end;
 $$;
@@ -775,7 +799,7 @@ create policy partners_select_business on public.partners
 
 Observações:
 
-- O usuário `PARTNER` lê **apenas o próprio perfil** (para a interface mostrar o estado "sem escopo"), e nada mais: negar por padrão até P-02b ([OFICIAL] RAT-D011 + [PENDENTE] P-02b; CA-06).
+- O usuário `PARTNER` lê **apenas o próprio perfil** (para a interface mostrar o estado "sem escopo"), e nada mais: negar por padrão até P-02b ([OFICIAL] RAT-D011, só para o login próprio do sócio + [PROPOSTA] negar por padrão: plano 6 e 17, aprovado + [PENDENTE] P-02b; CA-06). Mesma classificação de I-06.
 - O usuário sem papel (`role` nulo) também só lê o próprio perfil (estado "sem vínculo" do plano, E3; CA-08).
 - `profiles.id` em cascata com `auth.users` é mantido: um convite nunca aceito pode ser excluído pelo painel. Um usuário com histórico financeiro fica protegido pelas FKs `restrict` das tabelas de negócio (features), por `proof_files.uploaded_by` e pela trava do último Administrador. Política recomendada: **inativar, não excluir**. [PROPOSTA]
 - Escrita em `profiles` por `service_role` é revogada (seção 3.6): o runtime da FND não usa a chave secreta (plano 10) e nenhum fluxo legítimo precisa dela. O trigger do Auth e os procedimentos rodam como dono (`postgres`), e a exclusão em cascata a partir de `auth.users` roda com os privilégios do dono da tabela referenciadora; os dois caminhos continuam funcionando (confirmar no pgTAP de "Perfis"). [PROPOSTA]
@@ -1058,6 +1082,7 @@ Cada feature acrescenta as próprias concessões na sua migration (nunca `grant 
 | I-08 | Depois do primeiro Administrador, sempre existe ao menos um ativo | constraint trigger `profiles_admin_remains` + trava consultiva | [PROPOSTA] |
 | I-09 | A auditoria é append-only: sem `UPDATE`, `DELETE` ou `TRUNCATE`; nenhuma linha inserida fora das funções de auditoria | triggers + ausência de concessões (inclusive `INSERT` revogado de `service_role`) | [OFICIAL] RAT-D009 + [PROPOSTA] |
 | I-10 | Todo evento de auditoria tem horário do servidor, ordem total e origem | `created_at default clock_timestamp()`, `seq`, `source not null` | [PROPOSTA] (Brain 10, rascunho: timestamps de servidor) |
+| I-10b | Trigger não sobrescreve o contexto de auditoria da transação: criar um usuário em `auth.users` não muda motivo, origem, correlação nem rótulo das escritas seguintes; sem contexto, o `CREATE` do perfil sai como `SYSTEM`/`supabase-auth` | `private.handle_new_user` (lê, define só os vazios, restaura) + regra de 3.2 ("Quem define o contexto") + pgTAP (12.2) | [PROPOSTA] |
 | I-11 | Sócio não é excluído fisicamente | `partners_no_delete` | [PROPOSTA] (plano 7.1) |
 | I-12 | Um SHA-256 **declarado** é registrado uma única vez. Que o hash corresponda ao conteúdo só é garantido no caminho do route handler (R-D18) | `proof_files_sha256_key` | [OFICIAL] RN-008 + [PROPOSTA] |
 | I-13 | O caminho no bucket é definido pelo banco, contém o `id` e nunca o nome original | trigger `before insert` + CHECKs de caminho | [PROPOSTA] (plano 8) |
@@ -1462,12 +1487,13 @@ select a.partner_id, sum(a.rounding_adjustment) as residual_received
 | R-D19 | Plataforma / truncamento | Arquivo no limite chega truncado ao route handler (proxy do Next guarda até 10 MB e depois entrega corpo parcial **sem erro**) ou é recusado pela Vercel (corpo de Function limitado a cerca de 4,5 MB — a confirmar) | Média (E7) | Limite provisório reduzido para 4 MiB (3.5); rota de upload fora do matcher do proxy; handler compara bytes recebidos com `Content-Length`; teste de upload no tamanho máximo e acima dele (12.4) |
 | R-D20 | Escalada de acesso | Apagar um perfil e reinseri-lo já com papel (ou inserir com papel para um usuário sem perfil) contornaria a guarda de UPDATE | Baixa | Guarda `profiles_guard_insert` (motivo + serialização) e escrita em `profiles` revogada de `service_role` (3.3, 3.6); resíduo: `postgres` pode desligar triggers (acesso do responsável) |
 | R-D21 | Auditoria inutilizável | O trigger genérico identifica a linha por `id`; tabela auditada com PK composta faria toda escrita falhar | Média (features) | Regra "toda tabela auditada tem `id uuid`" (3.4); `client_partners` e `calculation_partner_balances` com chave substituta; erro explícito no trigger; teste de catálogo (12.2) |
+| R-D22 | Auditoria com origem/motivo errados | Função disparada por trigger que chama `set_audit_context` sobrescreve o contexto da transação inteira (ex.: criar usuário dentro de um script apagaria o motivo e atribuiria as escritas seguintes a `supabase-auth`) | Baixa | `handle_new_user` preserva e restaura o contexto (3.3); regra "Quem define o contexto" (3.2); I-10b; pgTAP (12.2) |
 
 ---
 
 ## 11. Divergências encontradas (Brain × plano × esta modelagem)
 
-O Brain e o plano **não foram editados** (regra da tarefa). Itens para o responsável/`engenheiro-software` registrarem. A coluna "Situação" reflete o plano revisão 6 e o Brain em 22/10/2026.
+O Brain e o plano **não foram editados** (regra da tarefa). Itens para o responsável/`engenheiro-software` registrarem. A coluna "Situação" reflete o plano revisão 7 (que não mudou nenhuma situação em relação à revisão 6) e o Brain em 23/10/2026.
 
 | # | Onde | Divergência | Sugestão | Situação |
 |---|---|---|---|---|
@@ -1489,7 +1515,7 @@ O Brain e o plano **não foram editados** (regra da tarefa). Itens para o respon
 | D-16 | Plano 14 (E4) | Lista só migrations e pgTAP para arquivar | Também `seed.sql`, `src/types/database.types.ts` e `scripts/seed-dev.ts` (7.2, passos 4 a 6) | **Aceita** (plano rev. 6, E4) |
 | D-17 | Plano 1.3, linha 25 | `competency_companies` (valor esperado por cliente no mês) fora do Brain | Não incluído no modelo; decidir na feature Competências junto com P-10 e P-12 | Aberta (feature Competências) |
 | D-18 | Plano 6 (matriz) e P-15/P-20 | "Leitura geral" do Visualizador inclui abrir o arquivo do comprovante? | M-04. Esta proposta segue a matriz aprovada (Visualizador lê), sujeita à revisão de segurança | Aberta (M-04) |
-| D-19 | Brain 09 (ativo) × M-01 | Brain 09: "Apurada: Motor de rateio executado e compensações calculadas", o que liga a execução do rateio à apuração. A M-01 propõe gerar o snapshot na confirmação do recebimento (como em 07/10) | Decidir M-01 citando o Brain 09. Se o rateio for na apuração, I-21 e I-25 mudam de gatilho (2.5, 4.2); a estrutura de `receipt_allocations` não muda | Aberta (M-01) |
+| D-19 | Brain 09 (ativo) × Brain 04 (ativo) × M-01 | **Dois documentos ativos do Brain apontam momentos diferentes para o rateio.** Brain 09 ("Estados", "Apurada"): "Motor de rateio executado e compensações calculadas", o que liga o rateio à **apuração**. Brain 04 ("Fluxo 3 — Lançamento manual"): "6. Sistema registra o recebimento. 7. Motor de rateio calcula os direitos econômicos.", o que liga o rateio ao **registro do recebimento** (o "Fluxo 5 — Apuração" do mesmo Brain 04 soma recebimentos e calcula o devido por sócio, sem mencionar o motor de rateio). A M-01 propõe gerar o snapshot na confirmação do recebimento (como em 07/10), em linha com o Brain 04 | Decidir M-01 citando os dois trechos (registro × apuração) e anotar no documento do Brain que ficar vencido. Se o rateio for na apuração, I-21 e I-25 mudam de gatilho (2.5, 4.2); a estrutura de `receipt_allocations` não muda. A decisão é do responsável | Aberta (M-01) |
 | D-20 | Plano 8 ("Upload mediado pelo servidor") | O modelo não obriga o caminho do servidor: Operador/Administrador conseguem chamar `register_proof_file` e o Storage direto, e o banco não confere hash nem tipo real | R-D18: aceite formal na FND + verificação posterior na feature de upload; decisão da `seguranca` (E8b) | Aberta (E8b) |
 | D-21 | Plano 8 ("Limites do Next 16") e P-15 | O plano conclui que o route handler resolve o limite do proxy, mas o route handler também passa pelo proxy quando o matcher cobre `/api` (corpo truncado sem erro acima de 10 MB); e a Vercel limita o corpo de Function a cerca de 4,5 MB (a confirmar). O valor provisório de 10 MiB não cabia | Limite provisório de 4 MiB; rota de upload fora do matcher; teste no tamanho máximo (3.5, 12.4) | Aberta (registrar no plano) |
 | D-22 | Plano 7.6 / 14 (E4: "novo seed local") | O plano não diz como o seed local atribui papéis; o `seed-dev` atual grava `profiles` pelo PostgREST, o que o modelo novo impede (escrita revogada, guarda exige motivo, schema `private` não exposto) | `seed-dev` em duas fases: usuários pela API admin do Auth local; papéis por `supabase db query --local -f` chamando `private.set_user_access` (7.2, passo 8) | Aberta (registrar no plano) |
@@ -1510,6 +1536,7 @@ O Brain e o plano **não foram editados** (regra da tarefa). Itens para o respon
 - [ ] Toda tabela auditada tem PK `id uuid` (3.4); associações usam chave substituta + `unique` no par natural.
 - [ ] Guardas `profiles_guard_update` **e** `profiles_guard_insert`; `revoke insert, update, delete, truncate` em `profiles` e `audit_logs` de `service_role` (3.6).
 - [ ] Bootstrap e `set_user_access`: `set_audit_context` antes de qualquer escrita (6.2, passo 3).
+- [ ] `private.handle_new_user` **literalmente** como em 3.3: não chama `set_audit_context`; define origem/rótulo só quando vazios e os restaura depois do `INSERT`; não toca motivo nem correlação (I-10b). Nenhuma outra função disparada por trigger chama `set_audit_context` (regra de 3.2, "Quem define o contexto").
 - [ ] `npm run db:types`.
 - [ ] Verificar R-D12 (trigger em `auth.users`, `storage.buckets` e políticas em `storage.objects` por migration) contra a documentação vigente antes de concluir.
 
@@ -1520,6 +1547,7 @@ O Brain e o plano **não foram editados** (regra da tarefa). Itens para o respon
 - [ ] **Perfis:** usuário novo nasce com `role` nulo; `PARTNER` sem `partner_id` falha; dois perfis com o mesmo sócio falham; mudar papel sem motivo falha; com motivo grava auditoria com `reason`; INSERT de perfil já com papel ou sócio sem motivo falha (também como `postgres`, sem contexto); `service_role` não insere, altera nem exclui perfis; exclusão em cascata a partir de `auth.users` continua funcionando para usuário não Administrador; remover/inativar o último Administrador falha (inclusive exclusão em cascata do Auth); `current_partner_id()` nulo para sócio inativo.
 - [ ] **Bootstrap:** placeholder rejeitado; e-mail inexistente rejeitado; usuário sem perfil prévio é promovido, com `ROW_CHANGE CREATE` + `ROW_CHANGE UPDATE` + `EVENT BOOTSTRAP_ADMIN`, todos com `source = SCRIPT`, motivo, `actor_label` e o mesmo `tx_id`; segunda execução retorna `ALREADY_ADMIN` sem novas linhas de auditoria; com outro Administrador ativo, falha; `EVENT BOOTSTRAP_ADMIN` e `ROW_CHANGE` com o mesmo `tx_id`, `source = SCRIPT`, `actor_label` preenchido.
 - [ ] **Auditoria:** `UPDATE`, `DELETE` e `TRUNCATE` em `audit_logs` falham (inclusive como `postgres`, para `UPDATE`/`DELETE`/`TRUNCATE` via trigger); `INSERT` direto em `audit_logs` por `authenticated` e `service_role` falha; trigger em tabela de teste sem coluna `id` falha com a mensagem da regra 3.4; `UPDATE` sem mudança não gera linha; diff só com colunas alteradas; `raw_extraction` aparece como `"[omitido]"`; `seq` cresce dentro da mesma transação; `source = DIRECT` em escrita sem contexto.
+- [ ] **Contexto × criação de usuário (I-10b):** (a) **sem contexto:** inserir um usuário em `auth.users` gera o `ROW_CHANGE CREATE` do perfil com `source = SYSTEM`, `actor_label = 'supabase-auth'` e `reason` nulo; em seguida, na mesma transação, uma escrita auditada sem contexto (ex.: `UPDATE` em `partners` como `postgres`) sai com `source = DIRECT` e `actor_label` nulo, e `current_setting('app.audit_source', true)` e `current_setting('app.audit_actor_label', true)` voltam vazios; (b) **com contexto:** depois de `private.set_audit_context('motivo de teste', 'SCRIPT', <uuid>, 'pgtap')`, inserir um usuário gera o `CREATE` do perfil com `source = SCRIPT`, o motivo, a correlação e `actor_label = 'pgtap'`; a escrita seguinte (ex.: mudar o papel desse perfil) passa pela guarda de motivo e grava os mesmos motivo, origem, correlação e rótulo; os quatro GUCs continuam iguais aos definidos. **Ordem nos arquivos pgTAP:** cada arquivo roda numa transação; os testes que conferem `source = DIRECT` ou motivo não dependem de os usuários de teste terem sido criados antes ou depois (a garantia é exatamente esta).
 - [ ] **Comprovantes:** campos controlados ignoram o que o cliente envia; caminho no formato `aaaa/mm/<id>.<ext>`; hash repetido detectado (CA-10); `STORED` sem objeto falha; com objeto de tamanho diferente falha; exclusão física falha; exclusão lógica só pelo Administrador, com motivo, e definitiva; `PARTNER` não lê `proof_files` nem objetos (CA-06).
 - [ ] **Storage:** INSERT em `storage.objects` só em caminho `PENDING_UPLOAD` e só para `ADMINISTRATOR`/`OPERATOR`; SELECT negado para `PARTNER`, sem papel e `anon`; UPDATE/DELETE negados para todos os papéis da aplicação.
 
@@ -1572,7 +1600,7 @@ O Brain e o plano **não foram editados** (regra da tarefa). Itens para o respon
 
 | ID | Pergunta | Proposta | Bloqueia |
 |---|---|---|---|
-| M-01 | O conjunto de sócios usado no rateio de um recebimento é o vigente **na confirmação** do recebimento, ou o vigente em outra data (data do recebimento, abertura da competência, **apuração**)? O Brain 09 (ativo) descreve o estado "Apurada" como "Motor de rateio executado e compensações calculadas", o que sugere o rateio na apuração (D-19) | Na confirmação (como em 07/10), com o snapshot preservando o resultado: o Operador vê o rateio de cada recebimento antes da apuração, e a apuração só soma snapshots já gravados. Se a decisão for "na apuração", mudam o gatilho de I-21/I-25 e a RPC que grava `receipt_allocations`; a tabela não muda | Feature Rateio |
+| M-01 | O conjunto de sócios usado no rateio de um recebimento é o vigente **na confirmação** do recebimento, ou o vigente em outra data (data do recebimento, abertura da competência, **apuração**)? Dois documentos ativos do Brain apontam momentos diferentes (D-19): o Brain 09 descreve o estado "Apurada" como "Motor de rateio executado e compensações calculadas" (rateio na **apuração**); o Brain 04, "Fluxo 3 — Lançamento manual", diz "6. Sistema registra o recebimento. 7. Motor de rateio calcula os direitos econômicos." (rateio no **registro do recebimento**) | Na confirmação (como em 07/10, e em linha com o Brain 04, Fluxo 3, passo 7), com o snapshot preservando o resultado: o Operador vê o rateio de cada recebimento antes da apuração, e a apuração só soma snapshots já gravados. Lido assim, o "Motor de rateio executado" do Brain 09 significa "todos os recebimentos da competência já têm rateio". Se a decisão for "na apuração", mudam o gatilho de I-21/I-25 e a RPC que grava `receipt_allocations`; a tabela não muda | Feature Rateio |
 | M-02 | Pode-se inativar um sócio que ainda está indicado em clientes ativos? E o `n` conta só sócios ativos? | Não pode inativar: exigir retirar as indicações antes, para que n nunca mude implicitamente. Com isso, "sócios indicados" (RAT-D015) e "sócios indicados ativos" coincidem | Feature Sócios |
 | M-03 | Um comprovante pode sustentar mais de um recebimento (ex.: um PDF com vários pagamentos)? | Não: no máximo um recebimento não cancelado por comprovante (I-29) | Feature Recebimentos |
 | M-04 | O Visualizador pode abrir o arquivo do comprovante, ou só ver os metadados? | Seguir a matriz aprovada (lê); revisar com `seguranca` e P-20 | Não bloqueia a FND (a proposta segue a matriz aprovada) |
@@ -1582,7 +1610,7 @@ O Brain e o plano **não foram editados** (regra da tarefa). Itens para o respon
 
 ## 14. Gate G1
 
-**APTA PARA IMPLEMENTAÇÃO** — para o escopo da FND (E4 e E7), com as condições abaixo. Revisão 2: os 10 problemas da revisão independente foram tratados (ver "Histórico de revisão").
+**APTA PARA IMPLEMENTAÇÃO** — para o escopo da FND (E4 e E7), com as condições abaixo. Revisão 2: os 10 problemas da revisão independente foram tratados. Revisão 3: os 3 problemas restantes da segunda rodada (contexto de auditoria em `handle_new_user`, rótulo do papel Sócio em 3.3, evidência do Brain 04 em D-19/M-01) foram tratados (ver "Histórico de revisão").
 
 Fundamentos (critério do agente: sem perda de dados não tratada, sem ambiguidade de cardinalidade, sem regra financeira indefinida **no escopo a implementar**):
 
@@ -1609,6 +1637,7 @@ Condições e ressalvas:
 |---|---|---|
 | 1 | 22/10/2026 | Versão inicial entregue para o G1 (plano revisão 5) |
 | 2 | 22/10/2026 | Correções da revisão independente (veredito "consistente com ressalvas", 10 problemas), sobre o plano revisão 6. Detalhe abaixo |
+| 3 | 23/10/2026 | Correções da segunda rodada da revisão independente (veredito "consistente com ressalvas": 1 item parcial e 3 problemas novos, um deles a mesma pendência do item parcial), sobre o plano revisão 7, antes da implementação na E4. Detalhe abaixo |
 
 Mudanças da revisão 2, por problema apontado:
 
@@ -1628,3 +1657,11 @@ Outras mudanças da revisão 2:
 - Cabeçalho e gate apontam para o plano revisão 6; `partners` mínima (D-01) consta como **aceita** e saiu das condições do gate.
 - Seção 11 ganhou a coluna "Situação". D-01, D-15 e D-16 aceitas no plano rev. 6; D-10, D-11 e D-12 resolvidas no Brain (notas de 22/10); D-08 parcial.
 - M-02 explicita a pergunta sobre o filtro de sócio ativo em `n`; P-21 inclui a extensão de I-27 a `CALCULATED`. Nenhuma pendência (M-01 a M-05, P-21) foi resolvida nesta revisão.
+
+Mudanças da revisão 3, por observação:
+
+1. **`private.handle_new_user` sobrescrevia o contexto de auditoria da transação (baixa; a DDL é implementada literalmente na E4).** A função chamava `set_audit_context(null, 'SYSTEM', null, 'supabase-auth')`, que, com `is_local = true`, vale até o fim da **transação**: apagava o motivo e a correlação e trocava origem e rótulo de toda escrita seguinte (pgTAP numa transação só, seed ou script no editor SQL que crie usuário). Agora a função não chama `set_audit_context`: lê `app.audit_source` e `app.audit_actor_label`, define `SYSTEM`/`supabase-auth` só quando a origem está vazia, faz o `INSERT` e restaura os dois valores anteriores; motivo e correlação nunca são tocados (3.3). O comentário da DDL registra duas premissas: `profiles_audit` é `AFTER ROW` não diferido (dispara antes da restauração) e o rollback de savepoint desfaz os `set_config`. Regra geral nova em 3.2 ("Quem define o contexto": trigger nunca chama `set_audit_context`), invariante I-10b, risco R-D22, pgTAP com e sem contexto (12.2) e item no handoff da E4 (12.1). A opção "passar a origem direto ao registro, sem GUC" foi descartada: o registro é gravado pelo trigger genérico `audit_row_change`, que não recebe parâmetros de quem escreve.
+2. **Rótulo do papel Sócio em 3.3, "Observações" (baixa; era o resto do item 8 da revisão 2).** O "negar por padrão até P-02b" passa a ter a mesma classificação de I-06: [OFICIAL] RAT-D011 só para o login próprio + [PROPOSTA] negar por padrão (plano 6 e 17, aprovado) + [PENDENTE] P-02b. Nenhum outro trecho atribui o "negar por padrão" a RAT-D011 (conferido em todo o documento).
+3. **D-19 e M-01 citavam só o Brain 09 (baixa).** As duas passam a citar também o Brain 04 (ativo), "Fluxo 3 — Lançamento manual", passos 6 e 7 ("Sistema registra o recebimento. Motor de rateio calcula os direitos econômicos."), e registram que dois documentos ativos do Brain apontam momentos diferentes (registro × apuração). M-01 continua DECISÃO PENDENTE; a decisão é do responsável.
+
+Outras mudanças da revisão 3: cabeçalho aponta para o plano revisão 7 (só muda a sequência E4/E5; nenhuma situação da seção 11 mudou); gate atualizado. Nenhuma pendência foi resolvida e nenhuma regra de negócio mudou.

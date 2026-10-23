@@ -8,8 +8,15 @@ const alertVariants = cva(
     variants: {
       variant: {
         default: "bg-card text-card-foreground",
+        // Tons semânticos (03-ui-ux.md, 0.5): fundo, texto e borda; o ícone acompanha o texto.
+        // A descrição herda a cor do tom (sem opacidade, para manter o contraste).
         destructive:
-          "bg-card text-destructive *:data-[slot=alert-description]:text-destructive/90 *:[svg]:text-current",
+          "border-danger-border bg-danger text-danger-foreground *:data-[slot=alert-description]:text-current *:[svg]:text-current",
+        info: "border-info-border bg-info text-info-foreground *:data-[slot=alert-description]:text-current *:[svg]:text-current",
+        success:
+          "border-success-border bg-success text-success-foreground *:data-[slot=alert-description]:text-current *:[svg]:text-current",
+        warning:
+          "border-warning-border bg-warning text-warning-foreground *:data-[slot=alert-description]:text-current *:[svg]:text-current",
       },
     },
     defaultVariants: {

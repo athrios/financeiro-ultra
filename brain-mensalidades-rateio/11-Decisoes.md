@@ -186,6 +186,18 @@ Origem: responsável pelo produto, 22/10/2026 ("Nomes fictícios para teste").
 
 ---
 
+## RAT-D020 — Postura de segurança para uso interno
+
+O sistema **não será público**: será usado internamente, pela equipe e pelos sócios, e não precisa de muitas camadas de segurança.
+
+Fica o básico, que é a base do sistema: login só por convite, papéis garantidos no banco ([[#RAT-D011 — Perfis de acesso]]), auditoria ([[#RAT-D009 — Auditoria obrigatória]]), comprovantes em área privada e segredos fora do código. Mesmo com uso interno, a hospedagem na Vercel ([[#RAT-D016 — Hospedagem e stack]]) deixa o endereço acessível pela internet. Por isso o login e as permissões continuam sendo a barreira.
+
+Ficam fora, salvo nova decisão: CAPTCHA e limite próprio de tentativas de login, política de conteúdo do navegador (CSP) mais rígida, proteção contra descobrir se um e-mail tem conta, e-mails de aviso (como o de senha alterada) e outras camadas extras. A revisão de segurança antes de publicar (E8b do plano FND-001) passa a ser uma conferência curta da configuração da Vercel e do Supabase.
+
+Origem: responsável pelo produto, 23/10/2026 (FND-001): "o sistema não será público, será usado internamente, não precisa de muitas camadas de segurança". A divisão entre o que fica e o que sai foi proposta pelo orquestrador na mesma data e apresentada ao responsável.
+
+---
+
 ## Decisões pendentes
 
 - **P-02b** — Escopo de acesso dos sócios com login próprio ([[#RAT-D011 — Perfis de acesso]]).

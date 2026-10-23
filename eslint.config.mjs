@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Referência histórica arquivada (nunca executada nem verificada).
+    "docs/legado/**",
   ]),
 ]);
 

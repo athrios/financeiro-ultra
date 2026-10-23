@@ -1,0 +1,3 @@
+- [Armadilhas da E4 (banco/seed/pgTAP)](project_fnd001-e4-gotchas.md) — db query uma instrução, constraint trigger diferido, tsx, senha do seed
+- [Armadilhas da E5 (Next 16/Supabase/smoke)](project_fnd001-e5-gotchas.md) — connection() no cliente Supabase, POST sem JS em PPR, regex do smoke, pgTAP com seed
+- [Correções E4/E5 (amr, PPR sem JS, sidebar, legado)](project_fnd001-correcoes-e4e5.md) — armadilhas da rodada pós-validação

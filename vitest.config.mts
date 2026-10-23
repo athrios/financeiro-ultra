@@ -9,6 +9,7 @@ export default defineConfig({
   },
   test: {
     include: ["src/**/*.test.ts"],
+    exclude: ["node_modules/**", "docs/legado/**"],
     environment: "node",
   },
 });

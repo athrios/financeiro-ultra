@@ -1,1 +1,2 @@
-- [Triagem E0 FND-001](project_fnd001-triagem-e0.md) — audit residual dev-only (braces sem fix), RAT-D019 vale para docs, .env.local nao legivel
+- [Triagem E0 FND-001](project_fnd001-triagem-e0.md) — audit residual dev-only (braces (resolvido em 23/10)), RAT-D019 vale para docs, .env.local nao legivel
+- [Revisao E4+E5 FND-001](project_fnd001-revisao-e4-e5.md) — 23/10: sem bloqueio; postura RAT-D020; abertos sha256 servidor (E7), senha legado, JWT pos-logout

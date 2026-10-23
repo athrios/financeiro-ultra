@@ -1,7 +1,15 @@
 import type { NextConfig } from "next";
 
+import { assertDeployEnv } from "./src/lib/env";
+import { buildSecurityHeaders } from "./src/lib/security-headers";
+
+// Na Vercel, APP_ENV precisa ser explícita (falha rápida no build e na subida; SEG-E45-06).
+assertDeployEnv(process.env);
+
 const nextConfig: NextConfig = {
   /* config options here */
+  // Não anuncia o framework em X-Powered-By (SEG-E45-07).
+  poweredByHeader: false,
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {
@@ -11,6 +19,20 @@ const nextConfig: NextConfig = {
         as: "*.css",
       },
     },
+  },
+  // Cabeçalhos de segurança (plano, seção 12). Avaliados na subida/build: dependem de
+  // NEXT_PUBLIC_SUPABASE_URL e APP_ENV, que fazem parte da configuração do ambiente.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: buildSecurityHeaders({
+          supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+          isDevelopment: process.env.NODE_ENV === "development",
+          isProductionEnv: process.env.APP_ENV === "production",
+        }),
+      },
+    ];
   },
 };
 

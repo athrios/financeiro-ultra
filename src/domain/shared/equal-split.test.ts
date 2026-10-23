@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import * as legacyApportion from "../distribution/apportion";
-import * as sharedApportion from "./apportion";
+import { apportion, tieBreakOrder } from "./apportion";
 import { equalDisplayPercentages, splitEqually } from "./equal-split";
 import { cents, parseMoney, sumCents, toMoneyString, type Cents } from "./money";
 import { FULL_PERCENT, toPercentageString } from "./percentage";
@@ -154,9 +153,33 @@ describe("splitEqually (valor pela fração exata)", () => {
   });
 });
 
-describe("apportion movido para shared", () => {
-  it("o módulo antigo apenas re-exporta o mesmo algoritmo", () => {
-    expect(legacyApportion.apportion).toBe(sharedApportion.apportion);
-    expect(legacyApportion.tieBreakOrder).toBe(sharedApportion.tieBreakOrder);
+describe("apportion (maior resto, em shared)", () => {
+  it("reparte pelo maior resto com soma exata", () => {
+    const result = apportion(
+      100,
+      [
+        { key: "a", weight: 1 },
+        { key: "b", weight: 1 },
+        { key: "c", weight: 1 },
+      ],
+      ["a", "b", "c"],
+    );
+    expect([...result.values()].reduce((sum, value) => sum + value, 0)).toBe(100);
+    expect(result.get("a")).toBe(34);
+    expect(result.get("b")).toBe(33);
+    expect(result.get("c")).toBe(33);
+  });
+
+  it("a ordem de desempate com semente é determinística e usa todas as chaves", () => {
+    const keys = ["a", "b", "c", "d"];
+    expect(tieBreakOrder(keys, "recebimento-1")).toEqual(tieBreakOrder(keys, "recebimento-1"));
+    expect([...tieBreakOrder(keys, "recebimento-1")].sort()).toEqual(keys);
+    expect(tieBreakOrder(keys)).toEqual(keys);
+  });
+
+  it("rejeita entradas inválidas", () => {
+    expect(() => apportion(-1, [{ key: "a", weight: 1 }], ["a"])).toThrow(RangeError);
+    expect(() => apportion(10, [], [])).toThrow(RangeError);
+    expect(() => apportion(10, [{ key: "a", weight: 0 }], ["a"])).toThrow(RangeError);
   });
 });

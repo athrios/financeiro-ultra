@@ -11,6 +11,8 @@ status: draft
 > - "parte" = **Sócio** ([[11-Decisoes#RAT-D017 — Vocabulário do sistema]]);
 > - "altera percentuais" e "alteração de percentual" não se aplicam mais: a divisão é sempre 1/n ([[11-Decisoes#RAT-D015 — Divisão igualitária por padrão]]);
 > - o produto atende uma única empresa, sem controle por organização ([[11-Decisoes#RAT-D010 — Empresa única no MVP]]).
+>
+> **Nota (23/10/2026)** — o sistema é de uso interno e fica no básico de segurança, sem camadas extras ([[11-Decisoes#RAT-D020 — Postura de segurança para uso interno]]).
 
 ## Perfis
 
