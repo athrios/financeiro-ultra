@@ -1,0 +1,1 @@
+- [Triagem E0 FND-001](project_fnd001-triagem-e0.md) — audit residual dev-only (braces sem fix), RAT-D019 vale para docs, .env.local nao legivel
