@@ -198,6 +198,16 @@ Origem: responsável pelo produto, 23/10/2026 (FND-001): "o sistema não será p
 
 ---
 
+## RAT-D021 — Motivo opcional nas ações auditadas
+
+O motivo **não é obrigatório**. As ações auditadas aceitam um motivo e o gravam na auditoria quando ele é informado, mas não são bloqueadas sem ele. A auditoria continua registrando quem fez, o quê, quando e de onde ([[#RAT-D009 — Auditoria obrigatória]]).
+
+Vale para as mudanças de acesso e a exclusão de comprovante (FND-001) e para a reabertura de competência ([[09-Competencias-e-Liquidacao#Reabertura]]), que registra o motivo quando informado.
+
+Origem: responsável pelo produto, 23/10/2026 (FND-001): "motivo não precisa de texto obrigatório". A aplicação à reabertura de competência é leitura do orquestrador, apresentada ao responsável.
+
+---
+
 ## Decisões pendentes
 
 - **P-02b** — Escopo de acesso dos sócios com login próprio ([[#RAT-D011 — Perfis de acesso]]).

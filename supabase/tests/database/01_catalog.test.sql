@@ -121,7 +121,7 @@ select ok(
 select set_eq(
   $$select p.proname::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'private' and has_function_privilege('authenticated', p.oid, 'execute')$$,
-  $$values ('audit_event'::text), ('set_audit_context'), ('require_audit_reason'), ('has_role'), ('is_admin'),
+  $$values ('audit_event'::text), ('set_audit_context'), ('has_role'), ('is_admin'),
            ('can_operate'), ('can_read_business'), ('current_partner_id'), ('proof_upload_allowed'),
            ('proof_readable'), ('normalize_alias')$$,
   'authenticated executa em private somente a lista explícita (RLS, RPCs invoker e coluna gerada)');

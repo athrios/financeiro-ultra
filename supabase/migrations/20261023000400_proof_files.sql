@@ -48,9 +48,9 @@ create table public.proof_files (
   constraint proof_files_confidence_range   check (confidence_score is null or confidence_score between 0 and 1),
   constraint proof_files_deletion_consistency check (
        (deleted_at is null and deleted_by is null and deletion_reason is null)
-    -- coalesce: com deletion_reason NULL o char_length vira NULL e o CHECK passaria (QA-B1)
-    or (deleted_at is not null and deleted_by is not null
-        and coalesce(char_length(btrim(deletion_reason)), 0) > 0))
+    -- RAT-D021: o motivo da exclusão é opcional; o CHECK exige só a coerência entre deleted_at e deleted_by.
+    -- Motivo em branco (espaços, tabs, quebras de linha) vira NULL no guard de UPDATE.
+    or (deleted_at is not null and deleted_by is not null))
 );
 comment on column public.proof_files.storage_path is
   'Definido pelo banco: {aaaa}/{mm}/{id}.{ext} (aaaa/mm do created_at em UTC). Nunca contém o nome original.';
@@ -132,6 +132,8 @@ begin
     end if;
     new.deleted_at := now();
     new.deleted_by := auth.uid();
+    -- RAT-D021: motivo opcional; em branco vira NULL, informado é gravado sem as bordas em branco.
+    new.deletion_reason := nullif(pg_catalog.btrim(new.deletion_reason, E' \t\r\n'), '');
   end if;
 
   -- Campos de extração: sem escrita pela aplicação na FND (a feature de leitura automática define quem grava).

@@ -3,7 +3,8 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { CORRELATION_HEADER, newCorrelationId } from "@/lib/correlation";
 import { supabasePublishableKey, supabaseUrl } from "@/lib/env";
-import { redirectsWhenAuthenticated, skipsLoginRedirect } from "@/lib/route-access";
+import { APP_ERROR_MESSAGES } from "@/lib/errors";
+import { isApiPath, redirectsWhenAuthenticated, skipsLoginRedirect } from "@/lib/route-access";
 import type { Database } from "@/types/database.types";
 
 import { supabaseCookieOptions } from "./cookie-options";
@@ -16,9 +17,10 @@ function hasSupabaseAuthCookie(request: NextRequest): boolean {
  * Executado pelo proxy em cada requisição:
  *   1. gera o correlation id da requisição (não confia no valor enviado pelo cliente);
  *   2. renova a sessão do Supabase (cookies);
- *   3. redireciona visitantes sem sessão para /login (guardando o destino e avisando
+ *   3. responde 401 em JSON a chamadas de /api sem sessão;
+ *   4. redireciona visitantes sem sessão para /login (guardando o destino e avisando
  *      "sessão expirada" quando havia um cookie de sessão vencido);
- *   4. redireciona usuários autenticados que abrem /login ou /recuperar-senha para /.
+ *   5. redireciona usuários autenticados que abrem /login ou /recuperar-senha para /.
  *
  * É uma verificação otimista. A autorização real acontece no servidor (cada página e
  * ação carrega a sessão e o perfil) e no banco (RLS).
@@ -57,6 +59,16 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   const isAuthenticated = Boolean(data?.claims?.sub);
   const { pathname, search } = request.nextUrl;
 
+  if (!isAuthenticated && isApiPath(pathname)) {
+    const unauthenticated = NextResponse.json(
+      { ok: false, error: { code: "UNAUTHENTICATED", message: APP_ERROR_MESSAGES.UNAUTHENTICATED } },
+      { status: 401, headers: { "Cache-Control": "no-store" } },
+    );
+    unauthenticated.headers.set(CORRELATION_HEADER, correlationId);
+    copyCookies(response, unauthenticated);
+    return unauthenticated;
+  }
+
   if (!isAuthenticated && !skipsLoginRedirect(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
@@ -78,6 +90,11 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   }
 
   return response;
+}
+
+/** Mantém na resposta os cookies que a renovação de sessão possa ter gravado. */
+function copyCookies(from: NextResponse, to: NextResponse): void {
+  from.cookies.getAll().forEach((cookie) => to.cookies.set(cookie));
 }
 
 function redirectPreservingCookies(

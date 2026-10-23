@@ -6,7 +6,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(54);
+select plan(57);
 
 -- -----------------------------------------------------------------------------
 -- Fixtures
@@ -170,12 +170,12 @@ select is((select n from affected_update), 0::bigint, 'OPERATOR não renomeia ne
 -- -----------------------------------------------------------------------------
 -- Leitura por papel: tabela e objetos
 -- -----------------------------------------------------------------------------
-select is((select count(*) from storage.objects where bucket_id = 'proofs'), 1::bigint, 'OPERATOR lê o objeto');
+select is((select count(*) from storage.objects where bucket_id = 'proofs' and owner_id::text like 'f1000000-%'), 1::bigint, 'OPERATOR lê o objeto');
 
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"f1000000-0000-4000-8000-000000000003","role":"authenticated"}', true);
-select is((select count(*) from storage.objects where bucket_id = 'proofs'), 1::bigint, 'VIEWER lê o objeto (M-04: segue a matriz aprovada)');
+select is((select count(*) from storage.objects where bucket_id = 'proofs' and owner_id::text like 'f1000000-%'), 1::bigint, 'VIEWER lê o objeto (M-04: segue a matriz aprovada)');
 select throws_ok(
   format($$insert into storage.objects (bucket_id, name, owner_id, metadata) values ('proofs', %L, %L, '{"size": 1, "mimetype": "application/pdf"}')$$,
          '2026/10/00000000-0000-4000-8000-000000000000.pdf', 'f1000000-0000-4000-8000-000000000003'),
@@ -198,7 +198,7 @@ select set_config('request.jwt.claims', '', true);
 select is((select count(*) from storage.objects where bucket_id = 'proofs'), 0::bigint, 'anon não lê objetos');
 
 -- -----------------------------------------------------------------------------
--- Exclusão lógica: só o Administrador, com motivo, definitiva (I-15)
+-- Exclusão lógica: só o Administrador, definitiva, motivo opcional (I-15, RAT-D021)
 -- -----------------------------------------------------------------------------
 reset role;
 set local role authenticated;
@@ -208,24 +208,43 @@ select throws_ok(
          'f1000000-0000-4000-8000-000000000002', (select proof_file_id from reg1)),
   '42501', 'Somente o Administrador exclui comprovantes.', 'OPERATOR não exclui logicamente');
 
+-- Três comprovantes extras (a exclusão é definitiva: cada caso usa o seu)
+create temp table regx as
+  select 'A'::text as k, f.* from public.register_proof_file(repeat('5', 64), 'application/pdf', 1000, 'a.pdf') f
+  union all
+  select 'B', f.* from public.register_proof_file(repeat('6', 64), 'application/pdf', 1000, 'b.pdf') f
+  union all
+  select 'C', f.* from public.register_proof_file(repeat('7', 64), 'application/pdf', 1000, 'c.pdf') f;
+
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"f1000000-0000-4000-8000-000000000001","role":"authenticated"}', true);
+-- RAT-D021: o motivo é opcional. Em branco (espaços, tabs, quebras de linha) ou omitido vira NULL.
+select lives_ok(
+  format($$update public.proof_files set deleted_at = now(), deleted_by = %L, deletion_reason = E'  \t\r\n ' where id = %L$$,
+         'f1000000-0000-4000-8000-000000000001', (select proof_file_id from regx where k = 'A')),
+  'Exclusão lógica com motivo só em branco funciona (RAT-D021)');
+select is(
+  (select deletion_reason from public.proof_files where id = (select proof_file_id from regx where k = 'A')),
+  null, 'Motivo em branco vira NULL');
+select lives_ok(
+  format($$update public.proof_files set deleted_at = now() where id = %L$$, (select proof_file_id from regx where k = 'B')),
+  'Exclusão lógica sem informar o motivo funciona (RAT-D021)');
+select ok(
+  (select deleted_at is not null and deleted_by = 'f1000000-0000-4000-8000-000000000001' and deletion_reason is null
+     from public.proof_files where id = (select proof_file_id from regx where k = 'B')),
+  'Sem motivo: excluído, autor = Administrador do JWT e deletion_reason NULL');
+-- A coerência continua: motivo sem exclusão é recusado pelo CHECK.
 select throws_ok(
-  format($$update public.proof_files set deleted_at = now(), deleted_by = %L, deletion_reason = '   ' where id = %L$$,
-         'f1000000-0000-4000-8000-000000000001', (select proof_file_id from reg1)),
-  '23514', null, 'Exclusão lógica sem motivo falha');
-select throws_ok(
-  format($$update public.proof_files set deleted_at = now(), deleted_by = %L, deletion_reason = null where id = %L$$,
-         'f1000000-0000-4000-8000-000000000001', (select proof_file_id from reg1)),
-  '23514', null, 'Exclusão lógica com motivo NULL falha (QA-B1: NULL não passa no CHECK)');
-select throws_ok(
-  format($$update public.proof_files set deleted_at = now() where id = %L$$, (select proof_file_id from reg1)),
-  '23514', null, 'Exclusão lógica sem informar o motivo falha (QA-B1)');
+  format($$update public.proof_files set deletion_reason = 'sem exclusão' where id = %L$$, (select proof_file_id from regx where k = 'C')),
+  '23514', null, 'Motivo sem exclusão (deleted_at nulo) falha no CHECK de coerência');
 select lives_ok(
   format($$update public.proof_files set deleted_at = '2000-01-01', deleted_by = %L, deletion_reason = 'duplicado' where id = %L$$,
          'f1000000-0000-4000-8000-000000000099', (select proof_file_id from reg1)),
   'ADMINISTRATOR exclui logicamente com motivo (data e autor informados são sobrescritos pelo servidor)');
+select is(
+  (select deletion_reason from public.proof_files where id = (select proof_file_id from reg1)),
+  'duplicado', 'O motivo informado é gravado');
 select is(
   (select deleted_by from public.proof_files where id = (select proof_file_id from reg1)),
   'f1000000-0000-4000-8000-000000000001'::uuid, 'deleted_by é o Administrador do JWT, não o valor enviado');
@@ -243,7 +262,7 @@ select set_config('request.jwt.claims', '{"sub":"f1000000-0000-4000-8000-0000000
 select results_eq(
   $$select deleted, is_duplicate from public.register_proof_file(repeat('1', 64), 'application/pdf', 1000, 'x.pdf')$$,
   $$values (true, true)$$, 'Reenvio de arquivo excluído logicamente devolve o registro existente (deleted = true)');
-select is((select count(*) from storage.objects where bucket_id = 'proofs'), 0::bigint,
+select is((select count(*) from storage.objects where bucket_id = 'proofs' and owner_id::text like 'f1000000-%'), 0::bigint,
   'O objeto de um comprovante excluído logicamente deixa de ser legível pela API');
 
 reset role;

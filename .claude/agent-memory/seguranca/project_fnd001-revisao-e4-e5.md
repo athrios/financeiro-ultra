@@ -20,3 +20,7 @@ Limite das provas: na FND as telas ainda sao placeholders e nenhuma carrega dado
 
 **Why:** evitar rediscutir pontos ja decididos e cobrar os abertos na etapa certa.
 **How to apply:** na E6/E7/E8/E9 conferir primeiro estes itens; repetir a prova de payload RSC quando houver dados. Ver tambem [[fnd001-triagem-e0]].
+
+Atualizacao 2026-10-23 (E8b, branch fnd-001/e7-e8): sem bloqueio. SEG-E45-03 corrigido na E7 (hash no servidor); caminho direto do Operador pela RPC = SEG-E8B-02 aceito_RAT-D020. SEG-E45-09 encerrado (responsavel confirmou que nunca foi usado). RAT-D021 (motivo opcional) nao afrouxou guardas. Novo BAIXO SEG-E8B-05: curinga *-<slug>.vercel.app nas Redirect URLs do checklist E9 (templates usam SiteURL, entao baixo). Na E9b: conferir Redirect URLs, actor 'athrios', push na main sem deploy.
+
+Revalidacao E8b 2026-10-23: SEG-E8B-05 corrigido no checklist (falta conferir tela na E9b). /auth/confirm usa referrer strict-origin (no-referrer gerava Origin null e quebrava Server Action sem JS) - nao voltar a sugerir no-referrer ali.

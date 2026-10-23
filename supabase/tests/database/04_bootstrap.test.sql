@@ -8,7 +8,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(28);
+select plan(29);
 
 create temp table marks (name text primary key, seq bigint);
 
@@ -110,9 +110,17 @@ select lives_ok(
 -- -----------------------------------------------------------------------------
 -- set_user_access: contrato de 6.3
 -- -----------------------------------------------------------------------------
-select throws_ok(
-  $$select private.set_user_access('pgtap-segundo@example.com', 'OPERATOR', null, true, '   ', 'pgtap-exec')$$,
-  '22023', null, 'set_user_access exige motivo');
+-- RAT-D021: o motivo é opcional; em branco ou nulo, a mudança é feita e auditada com reason nulo.
+select lives_ok(
+  $$select private.set_user_access('pgtap-segundo@example.com', 'OPERATOR', null, true, E' \t\r\n ', 'pgtap-exec')$$,
+  'set_user_access funciona sem motivo (RAT-D021)');
+select results_eq(
+  $$select kind::text, action, reason, source::text, actor_label from public.audit_logs
+     where entity_id = 'f1000000-0000-4000-8000-000000000002' and action in ('UPDATE', 'ACCESS_CHANGE')
+     order by seq desc limit 2$$,
+  $$values ('EVENT', 'ACCESS_CHANGE', null, 'SCRIPT', 'pgtap-exec'),
+           ('ROW_CHANGE', 'UPDATE', null, 'SCRIPT', 'pgtap-exec')$$,
+  'Sem motivo: ROW_CHANGE + EVENT auditados com reason nulo, origem SCRIPT e rótulo');
 select throws_ok(
   $$select private.set_user_access('pgtap-segundo@example.com', 'OPERATOR', null, true, 'motivo', '')$$,
   '22023', null, 'set_user_access exige identificação de quem executa');
@@ -142,7 +150,7 @@ select is(
 select is(
   (select new_data ->> 'previous_role' from public.audit_logs
     where seq > (select seq from marks where name = 'acesso') and action = 'ACCESS_CHANGE'),
-  null, 'O EVENT ACCESS_CHANGE registra o papel anterior (nulo)');
+  'OPERATOR', 'O EVENT ACCESS_CHANGE registra o papel anterior (OPERATOR, atribuído sem motivo acima)');
 select is(
   (select (new_data::text ~ '@')::text from public.audit_logs
     where seq > (select seq from marks where name = 'acesso') and action = 'ACCESS_CHANGE'),

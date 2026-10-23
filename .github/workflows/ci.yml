@@ -1,0 +1,131 @@
+name: CI
+
+# FND-001, E8 (plano, seções 10 e 11). Roda em todo push e pull request. Só actions oficiais
+# (actions/checkout e actions/setup-node) e o CLI do Supabase que já é dependência do projeto.
+# Não usa nenhum segredo do repositório: o Supabase é o local, subido dentro do runner, e todas
+# as chaves abaixo são geradas por ele e valem só durante esta execução.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22"
+  # Variáveis que a aplicação valida no boot (src/lib/env.ts).
+  APP_ENV: local
+  LOG_LEVEL: info
+
+jobs:
+  # Verificações que não precisam de Docker: rodam em paralelo com o job de integração.
+  qualidade:
+    name: Lint, tipos, unitários e auditoria
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Instalar dependências
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Tipos
+        run: npm run typecheck
+      - name: Testes de unidade
+        run: npm test
+      - name: Auditoria das dependências de produção (CA-02)
+        run: npm audit --omit=dev --audit-level=high
+
+  integracao:
+    name: Banco, build e ponta a ponta
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Instalar dependências
+        run: npm ci
+
+      # Só o necessário para os testes: banco, Auth, API REST, Storage, gateway e Mailpit.
+      - name: Subir o Supabase local
+        run: npx supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,postgres-meta,realtime > /dev/null
+
+      - name: Exportar a configuração do Supabase local
+        run: |
+          npx supabase status -o env > "$RUNNER_TEMP/supabase.env"
+          get() { grep "^$1=" "$RUNNER_TEMP/supabase.env" | head -1 | cut -d= -f2- | tr -d '"'; }
+          for name in PUBLISHABLE_KEY SECRET_KEY SERVICE_ROLE_KEY; do echo "::add-mask::$(get "$name")"; done
+          password="Ci-$(openssl rand -hex 12)-9"
+          echo "::add-mask::$password"
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$(get API_URL)"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$(get PUBLISHABLE_KEY)"
+            echo "E2E_SUPABASE_SECRET_KEY=$(get SECRET_KEY)"
+            echo "E2E_SERVICE_ROLE_KEY=$(get SERVICE_ROLE_KEY)"
+            echo "DEV_SEED_PASSWORD=$password"
+          } >> "$GITHUB_ENV"
+          rm -f "$RUNNER_TEMP/supabase.env"
+
+      - name: Recriar o banco do zero (CA-04)
+        run: npx supabase db reset
+
+      - name: Testes de banco, pgTAP (CA-05, CA-06, CA-07, CA-09)
+        run: npx supabase test db
+
+      - name: Lint do schema
+        run: npx supabase db lint --fail-on error
+
+      - name: Advisors de segurança (CA-04)
+        run: npx supabase db advisors --local --type security --level warn --fail-on warn
+
+      - name: Build (CA-03)
+        run: npm run build
+
+      - name: A chave secreta não está no bundle do navegador (CA-12)
+        run: npm run check:bundle
+
+      - name: Dados fictícios do seed
+        run: npx tsx scripts/seed-dev.ts
+        env:
+          SUPABASE_SECRET_KEY: ${{ env.E2E_SUPABASE_SECRET_KEY }}
+
+      - name: Subir a aplicação
+        run: |
+          nohup npm start > "$RUNNER_TEMP/next.log" 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fsS -o /dev/null http://127.0.0.1:3001/login; then echo "Aplicação no ar."; exit 0; fi
+            sleep 1
+          done
+          echo "A aplicação não subiu em 60 s:"; tail -n 40 "$RUNNER_TEMP/next.log"; exit 1
+
+      - name: Testes de integração e ponta a ponta (CA-08, CA-10)
+        run: npm run test:e2e
+
+      - name: A aplicação não registrou erro inesperado
+        run: |
+          if grep -E '"level":"error"|unstable value' "$RUNNER_TEMP/next.log" > /dev/null; then
+            echo "O servidor registrou erros durante os testes:"
+            grep -E '"level":"error"|unstable value' "$RUNNER_TEMP/next.log" | head -n 20
+            exit 1
+          fi
+          echo "Sem eventos de erro no log do servidor."
+
+      - name: Log do servidor (só em falha)
+        if: failure()
+        run: tail -n 80 "$RUNNER_TEMP/next.log" || true

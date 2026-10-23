@@ -59,7 +59,7 @@ Os modelos de e-mail em português ficam em `supabase/templates/` (`invite.html`
 ### Dados de desenvolvimento
 
 ```bash
-npm run seed:dev      # cria usuários fictícios e atribui os papéis (com motivo e auditoria)
+npm run seed:dev      # cria usuários fictícios e atribui os papéis (com auditoria)
 ```
 
 O `seed:dev` funciona em duas fases: (1) cria os usuários fictícios (`@example.com`) pela API admin do Auth **local**, e o banco cria os perfis **sem papel**; (2) atribui os papéis executando `scripts/sql/seed-dev-access.sql` com `supabase db query --local`, que chama o procedimento auditado `private.set_user_access` como `postgres`. Os papéis criados são Administrador, Operador, Visualizador, Sócio (acesso a dados negado por padrão até a decisão P-02b) e um usuário sem papel. Todos os dados de seed, testes e exemplos usam apenas nomes fictícios, e não há percentuais armazenados (a divisão é sempre 1/n).
@@ -74,16 +74,56 @@ O `seed:dev` só roda contra o Supabase local: o `hostname` de `NEXT_PUBLIC_SUPA
 | `npm run db:stop` | Para o Supabase local. |
 | `npm run db:reset` | Recria o banco local do zero: migrations + `supabase/seed.sql`. |
 | `npm run seed:dev` | Cria usuários fictícios e atribui papéis, só no Supabase local (exige `.env.local`). |
-| `npm run db:test` | Testes de banco (pgTAP, `supabase/tests/database/`, 6 arquivos / 220 testes) sobre o Supabase local. Cada arquivo roda numa transação desfeita no fim e não depende dos dados do `seed:dev` (passa logo após `db:reset` e depois do `seed:dev`). |
+| `npm run db:test` | Testes de banco (pgTAP, `supabase/tests/database/`, 6 arquivos / 237 testes) sobre o Supabase local. Cada arquivo roda numa transação desfeita no fim e não depende dos dados do `seed:dev` (passa logo após `db:reset` e depois do `seed:dev`). |
 | `npm run db:types` | Regenera `src/types/database.types.ts` a partir do banco local. |
 | `npm run dev` | Servidor de desenvolvimento do Next.js na porta 3001. |
 | `npm run start` | Servidor de produção (depois de `npm run build`) na porta 3001. |
-| `npm test` | Testes unitários (Vitest). |
+| `npm test` | Testes unitários (Vitest). Não exigem Supabase nem servidor. |
+| `npm run test:e2e` | Testes de integração e ponta a ponta por HTTP (Vitest + `fetch`, config `vitest.e2e.config.mts`, pasta `tests/e2e/`): comprovantes (E7) e acesso (E8: login, logout, guarda de rota, usuário inativo ou sem papel, auto-cadastro desligado, convite, definir senha e recuperação, com e-mails lidos no Mailpit local). Veja a seção abaixo. |
+| `npm run check:bundle` | CA-12: confere que nenhuma chave secreta do Supabase está em `.next/static` (rode depois do `build`). |
 | `npm run lint` | ESLint. |
 | `npm run typecheck` | Gera os tipos de rota do Next e roda `tsc --noEmit`. |
 | `npm run build` | Build de produção. |
 
 **Porta 3001:** fixa nos scripts, porque o `config.toml` do Supabase aponta para ela. Se estiver ocupada, o Next.js falha em vez de trocar de porta (com `-p`), e o link dos e-mails deixaria de funcionar.
+
+## Testes de integração e ponta a ponta
+
+Não usam navegador (o Playwright não foi aprovado): cada passo é uma requisição HTTP real ao `next start` e ao Supabase local. Os formulários são enviados como um navegador enviaria (campos ocultos da Server Action incluídos), e os e-mails de convite e recuperação são lidos no Mailpit do Supabase local (`http://127.0.0.1:54324`). Só usuários fictícios e só alvo local (a configuração recusa qualquer outro endereço).
+
+```bash
+npm run db:start
+npm run db:reset
+DEV_SEED_PASSWORD=<uma-senha-local> npm run seed:dev   # a mesma senha vai para o passo abaixo
+npm run build && npm start                              # porta 3001, em outro terminal
+DEV_SEED_PASSWORD=<a-mesma-senha> npm run test:e2e
+```
+
+- Variáveis lidas do ambiente ou do `.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `DEV_SEED_PASSWORD`. Opcionais: `E2E_BASE_URL` (padrão `http://127.0.0.1:3001`) e `E2E_MAILPIT_URL`.
+- Os testes de convite precisam da chave secreta do Supabase **local** (`SECRET_KEY` de `npx supabase status -o env`) para convidar o usuário pela API administrativa, como o painel faz no ambiente hospedado. Ela vem de `E2E_SUPABASE_SECRET_KEY` ou do `SUPABASE_SECRET_KEY` do `.env.local`. A aplicação nunca lê essa chave.
+- O `npm test` continua sem exigir Supabase nem servidor.
+- Os testes deixam usuários e comprovantes fictícios no banco local; `npm run db:reset` limpa.
+
+## Integração contínua (CI)
+
+`.github/workflows/ci.yml` roda em todo push e pull request, com `permissions: contents: read`, só as actions oficiais `actions/checkout` e `actions/setup-node` e o CLI do Supabase do próprio projeto. Uma nova execução cancela a anterior da mesma branch. Não usa nenhum segredo do repositório.
+
+| Job | Passos |
+|---|---|
+| `qualidade` | `npm ci`; `lint`; `typecheck`; `npm test`; `npm audit --omit=dev --audit-level=high` (CA-02) |
+| `integracao` | Supabase local (sem Studio, Edge Runtime e demais serviços desnecessários); `db reset`; pgTAP; `db lint`; `db advisors` (segurança, falha em WARN); `build`; `check:bundle` (CA-12); `seed`; `next start`; `test:e2e`; confere que o log do servidor não tem erro |
+
+Para reproduzir localmente na mesma ordem, siga a seção anterior e rode `npm run lint && npm run typecheck && npm test`, `npx supabase db reset && npm run db:test`, `npx supabase db lint --fail-on error`, `npx supabase db advisors --local --type security --level warn --fail-on warn`, `npm run build && npm run check:bundle`.
+
+## Publicação (migrations antes do deploy)
+
+O banco hospedado e a Production só mudam por `.github/workflows/migrations.yml`:
+
+1. Merge na `main` (a CI precisa estar verde). A Vercel **não** publica a `main` sozinha (`vercel.json`: `git.deploymentEnabled.main = false`); Previews de outras branches e PRs seguem automáticos.
+2. O responsável (usuário `athrios`) dispara à mão **Actions > Migrations e publicação em Production** na `main`. O job só roda para esse usuário. A opção "Só simular" executa `supabase db push --dry-run` e para.
+3. O workflow liga o projeto, aplica as migrations (`supabase db push`) e **só depois** chama o deploy hook da Vercel, que publica a Production.
+
+Segredos do GitHub usados (nomes; os valores ficam só no GitHub): `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `SUPABASE_DB_PASSWORD`, `VERCEL_DEPLOY_HOOK_URL`. Nunca rode `supabase config push` com o `config.toml` atual (é do ambiente local). O passo a passo dos painéis está em [`docs/features/FND-001-fundacao/checklist-e9.md`](docs/features/FND-001-fundacao/checklist-e9.md). O primeiro Administrador é criado com `scripts/sql/bootstrap-first-admin.sql` (instruções no próprio arquivo).
 
 ## Estrutura
 
@@ -92,7 +132,8 @@ O `seed:dev` só roda contra o Supabase local: o `hostname` de `NEXT_PUBLIC_SUPA
 - `src/components/shell/` (shell, navegação e estados de acesso), `src/components/auth/`, `src/components/ui/`.
 - `src/server/` (sessão, autorização para UX, contexto de requisição) e `src/lib/` (env, erros, logger, redirecionamento seguro, cabeçalhos de segurança, navegação, papéis).
 - `supabase/`: migrations (linha de base de 23/10/2026), seed e testes de banco (pgTAP).
-- `scripts/`: utilitários de desenvolvimento (`seed-dev.ts` e `sql/seed-dev-access.sql`).
+- `scripts/`: utilitários de desenvolvimento (`seed-dev.ts`, `check-bundle-secrets.ts`) e SQL versionado (`sql/seed-dev-access.sql` do seed local; `sql/bootstrap-first-admin.sql` e `-verify.sql` do primeiro Administrador no ambiente hospedado).
+- `.github/workflows/`: `ci.yml` (verificações) e `migrations.yml` (migrations + publicação de Production, só pelo responsável). `vercel.json`: região das funções e Production sem deploy automático.
 - `docs/legado/07-10/`: referência histórica arquivada (fora do tsc, do ESLint e do Vitest; nunca aplicada).
 
 ## Documentação

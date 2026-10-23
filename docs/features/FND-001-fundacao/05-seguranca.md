@@ -169,8 +169,87 @@ Em 23/10/2026 o responsável decidiu que o sistema é de uso interno e não prec
 - Configuração remota (Supabase hospedado e Vercel) não foi verificada: secure_password_change, enable_signup=false, redirect URLs, APP_ENV e ausência da chave secreta nas variáveis da Vercel.
 - Efeito colateral local: o seed:dev foi rodado com uma DEV_SEED_PASSWORD aleatória própria; as senhas dos 5 usuários fictícios locais mudaram (o valor está em <scratchpad>\sec\pw.secret). O servidor next start (PID 61628) foi encerrado e a porta 3001 está livre. O Supabase local continua rodando.
 
+## E8b (23/10/2026)
+
+**Bloqueia release:** não. Conferência curta do básico (RAT-D020), somente leitura, sobre a rodada E7 + E8 + ajustes RAT-D021/QA da branch `fnd-001/e7-e8`. Revisão de código e consultas SELECT ao Supabase local; o ambiente de execução (build, next start, e2e) ficou com o QA.
+
+| Item | Severidade | Status |
+|---|---|---|
+| SEG-E8B-01 Upload e leitura de comprovantes | informativo | ok |
+| SEG-E45-03 Hash calculado no servidor | médio | corrigido |
+| SEG-E8B-02 Operador pela RPC/storage direto com hash falso | médio | aceito_RAT-D020 |
+| SEG-E8B-03 RAT-D021 (motivo opcional) sem afrouxar guardas | informativo | ok |
+| SEG-E8B-04 CI e workflow de migrations | informativo | ok |
+| SEG-E8B-05 Curinga de Redirect URL de Preview no checklist | baixo | novo |
+| SEG-E8B-06 Bootstrap e checklist da E9 | informativo | ok |
+| SEG-E8B-07 Segredos e nomes reais no repositório | informativo | ok |
+
+### SEG-E8B-01 · informativo · ok
+
+- **Evidência:** `POST /api/comprovantes` autoriza antes de ler o corpo (`requireProofRole` + `canUploadProof`: só Administrador e Operador; `loadSession` lê o perfil pelo RLS e trata sem perfil, inativo e sem papel como sem acesso; Sócio fica fora da lista). Limite do corpo explícito (Content-Length e contagem de bytes, 4 MiB + 64 KiB) e, no banco, `file_size_limit` do bucket = 4 MiB. Validação pela assinatura binária (`%PDF-` no byte 0, PNG, JPEG) coerente com extensão e tipo declarado. SHA-256 calculado no servidor; o hash do cliente não é usado. Caminho `{aaaa}/{mm}/{id}.{ext}` gerado pelo banco e conferido por CHECK (`proof_files_path_format`); o nome original só fica em coluna de metadado, limitado a 255. Upload com a sessão do usuário e `upsert:false`. Bucket `proofs` privado (confirmado no banco local). Leitura só por `GET /api/comprovantes/{id}/url`: papel conferido no servidor (Administrador, Operador, Visualizador), linha lida pelo RLS, só STORED e não excluído, URL assinada de 60 s, que não vai para o log. Erros em JSON com mensagem fixa em pt-BR; erro inesperado vira a mensagem genérica e a causa fica só no log do servidor. Sem sessão em `/api`, o proxy responde 401 JSON. Nenhum uso de `SUPABASE_SECRET_KEY` nas rotas nem em `src/server/proofs`; `env.ts` recusa a chave fora do ambiente local.
+- **Correção ou próximo passo:** Nenhuma.
+
+### SEG-E45-03 · médio · corrigido
+
+- **Evidência:** No caminho da aplicação, o hash é calculado pelo servidor sobre os bytes recebidos (`sha256Hex`) e é ele que vai para `register_proof_file`; o e2e cobre "hash falso do cliente ignorado". Ao concluir, `private.proof_files_guard_update` confere nome, tamanho e tipo em `storage.objects`.
+- **Correção ou próximo passo:** Nenhuma. O resto (chamada direta) está no SEG-E8B-02.
+
+### SEG-E8B-02 · médio · aceito_RAT-D020
+
+- **Evidência:** Um Operador autenticado pode chamar `register_proof_file` e o Storage direto, sem passar pela rota, registrando um hash qualquer e enviando conteúdo diferente com o mesmo tamanho e tipo. O banco confere só a coerência entre linha e objeto. Isso está registrado no 04 (E7) e caracterizado pelo e2e "caminho direto". Visualizador, Sócio e sem papel recebem 42501.
+- **Correção ou próximo passo:** Aceito pela RAT-D020, sem camada extra. Reduzir exigiria tirar a escrita direta do Operador (decisão de produto). Rever quando houver tela de upload ou dados reais.
+
+### SEG-E8B-03 · informativo · ok
+
+- **Evidência:** Diff das migrations: saiu só a exigência de motivo (`require_audit_reason` removida; os guardas de `profiles` e `set_user_access` não a chamam mais; o CHECK de exclusão lógica exige só a coerência entre `deleted_at` e `deleted_by`). Motivo em branco (espaço, tab, CR, LF) vira NULL em `set_audit_context`, `audit_insert` e no guard de `proof_files`. Ficaram intactos: a serialização por advisory lock nos guardas de `profiles`, o constraint trigger diferido `profiles_admin_remains` (último Administrador), o trigger de auditoria em INSERT/UPDATE/DELETE de `profiles`, as políticas sem INSERT/UPDATE/DELETE em `profiles` para authenticated e a exclusão de comprovante só pelo Administrador. No banco local: authenticated e service_role sem escrita em `profiles`; authenticated sem UPDATE, DELETE ou TRUNCATE em `audit_logs`; `bootstrap_first_admin` e `set_user_access` sem EXECUTE para anon e authenticated; `require_audit_reason` não existe mais. Autopromoção continua impossível pela API. A auditoria (quem, o que, quando, de onde) é gravada mesmo sem motivo, como provam os pgTAP 03, 04 e 06 relatados pelo dev.
+- **Correção ou próximo passo:** Nenhuma. O 02-modelagem-dados.md ainda descreve motivo obrigatório (D-E4-13), o que é divergência de documento e não de segurança.
+
+### SEG-E8B-04 · informativo · ok
+
+- **Evidência:** `ci.yml`: `permissions: contents: read`, checkout com `persist-credentials: false`, gatilhos `push` e `pull_request` (sem `pull_request_target`), nenhum segredo do repositório. As chaves do Supabase local são mascaradas com `::add-mask::` e o arquivo temporário é apagado. A chave secreta local entra só no passo do seed (env do passo); o `next start` não a recebe com o nome que a aplicação lê. `check:bundle` roda depois do build e procura os valores conhecidos (`SUPABASE_SECRET_KEY`, `E2E_SUPABASE_SECRET_KEY` e as service_role), além de `sb_secret_` e JWT com role service_role, sem imprimir o valor. `migrations.yml`: só `workflow_dispatch`; o job exige `github.actor` e `github.triggering_actor` iguais ao responsável e `github.ref == refs/heads/main`; `permissions: contents: read`; segredos só no `env` dos passos que os usam; ordem simulação, `db push` e só depois o deploy hook; `curl` sem eco, com a saída em arquivo; nunca roda `config push`. `vercel.json`: região gru1 e `git.deploymentEnabled.main=false`. Observações que não são achados: (a) confirmar que `athrios` é exatamente o usuário do GitHub do responsável; se não for, o job fica sempre pulado, o que é seguro; (b) o deploy hook publica o último commit da `main` no momento da chamada, não necessariamente o commit migrado, o que não preocupa com um único responsável; (c) as actions são fixadas por tag (`@v4`), e não por SHA.
+- **Correção ou próximo passo:** Nenhuma. Na E9b, guardar a evidência da primeira execução real (job pulado para outro usuário, push na main sem deploy, hook publicando Production).
+
+### SEG-E8B-05 · baixo · novo
+
+- **Evidência:** O checklist da E9 (passo 3) manda cadastrar `https://*-<slug>.vercel.app/auth/confirm` como Redirect URL. O curinga também casa com a URL de Production de um projeto de outra conta da Vercel cujo nome termine em `-<slug>` (por exemplo `algo-<slug>.vercel.app`). O risco é baixo porque os modelos de convite e recuperação usam `{{ .SiteURL }}` e não `{{ .RedirectTo }}`, e a aplicação não passa `redirectTo`. Por isso o token não iria para outro domínio. Mesmo assim, a entrada é mais larga do que precisa, e Preview e Production usam o mesmo projeto Supabase (P-05c2).
+- **Correção ou próximo passo:** No checklist, preferir só `<site-de-production>/auth/confirm`, mais a URL fixa de branch do Preview quando ela for necessária (`<projeto>-git-<branch>-<slug>.vercel.app/auth/confirm`). Se o curinga continuar, registrar o aceite e manter os modelos com `SiteURL`. Para validar, conferir na tela URL Configuration da E9b que só existem as entradas esperadas.
+
+### SEG-E8B-06 · informativo · ok
+
+- **Evidência:** `bootstrap-first-admin.sql` só tem marcadores (`<EMAIL-DO-ADMINISTRADOR>`, `<IDENTIFICACAO-DE-QUEM-EXECUTA>`), com aviso para não versionar a versão preenchida; o script de conferência não mostra e-mail. O checklist manda desligar o auto-cadastro, testar o `signup_disabled` (CA-15), não usar `localhost` nem `*.vercel.app/**`, não cadastrar a chave secreta, a service_role nem a string de conexão na Vercel (inclusive removendo as que a integração criar) e não rodar `config push`. Os modelos de e-mail usam `token_hash` com `SiteURL`.
+- **Correção ou próximo passo:** Nenhuma, além do SEG-E8B-05.
+
+### SEG-E8B-07 · informativo · ok
+
+- **Evidência:** Busca nos 60 arquivos alterados ou novos da rodada (sem `.acessos`): nenhuma chave `sb_secret_`/`sb_publishable_` real, nenhum JWT real, nenhuma URL de projeto hospedado ou de deploy hook, nenhuma senha local usada nos testes desta rodada. Só aparecem valores fictícios nos testes do detector. Não há e-mail pessoal; o único identificador real é o usuário do GitHub do repositório, que já estava no plano. `.env.local` e `.acessos/` continuam ignorados pelo git.
+- **Correção ou próximo passo:** Nenhuma.
+
+**Não verificado nesta conferência:**
+
+- Execução real da CI e do workflow de migrations no GitHub, do deploy hook e do `vercel.json` (dependem da E9).
+- Configuração hospedada (Supabase Auth e variáveis da Vercel), que fica para a E9b.
+- Não reexecutei o e2e nem o pgTAP (ambiente com uso exclusivo do QA). Confiei no relato do dev e em duas consultas SELECT ao banco local.
+- Controle positivo do payload RSC com dados de negócio, porque ainda não há tela que mostre comprovantes.
+
+### Revalidação (23/10/2026)
+
+**Bloqueia release:** não. Rodada curta, somente leitura de código e documentos (sem build, servidor, reset ou seed; o ambiente estava com o QA).
+
+| Item | Severidade | Status |
+|---|---|---|
+| SEG-E8B-05 Curinga de Redirect URL no checklist | baixo | corrigido |
+| B-01/B2 Troca de `no-referrer` por `strict-origin` em `/auth/confirm` | informativo | ok |
+| 02-modelagem-dados.md sincronizado (revisão 4) | informativo | ok |
+
+- **SEG-E8B-05:** o passo 3 do `checklist-e9.md` agora pede só `<site-de-production>/auth/confirm` e, se necessário, a URL fixa de branch do Preview, e proíbe de forma explícita `*.vercel.app/**` e `*-<slug>.vercel.app/...`, com o motivo. Os modelos de e-mail continuam com `{{ .SiteURL }}`. Ainda falta conferir na tela URL Configuration durante a E9b.
+- **B-01/B2:** a mudança se resume ao `referrer` do metadata da página. `strict-origin` manda no máximo o domínio, nunca o caminho nem a query com o `token_hash`, e não manda nada em downgrade de HTTPS para HTTP. Então a intenção do `no-referrer` (token fora do Referer) continua valendo. O `robots` noindex/nofollow ficou. A proteção de origem das Server Actions não foi afrouxada: não há `serverActions.allowedOrigins` no `next.config`, e a correção faz o navegador mandar o Origin verdadeiro em vez de `null`, sem desligar a checagem. A ação `confirmAuthLink` não mudou: revalida o formato com `parseAuthLink`, chama `verifyOtp` só no clique, tem destino fixo (`/definir-senha?modo=...`) sem parâmetro de redirecionamento e não registra o token no log. O teste de unidade novo trava `strict-origin` e o noindex. Também conferido o B3: o aviso `senha-definida` saiu de `/login` sem deixar referência.
+- **02 sincronizado:** conferido por amostragem contra as migrations. `require_audit_reason` aparece como retirada, e as funções `SECURITY DEFINER` usam `search_path = ''`. Em `bootstrap_first_admin` e `set_user_access`, o EXECUTE está revogado de `public`, `anon`, `authenticated` e `service_role`. O bootstrap roda em uma única instrução. TRUNCATE está revogado e há triggers `BEFORE TRUNCATE`. Para `proof_upload_allowed`, o documento exige `uploaded_by = auth.uid()`. O bucket é privado e não tem UPDATE/DELETE em `storage.objects`. Os grants de `audit_event`/`set_audit_context` para `authenticated` batem com a migration `0200`. Não encontrei nada no documento menos restritivo que o implementado.
+
+**Não verificado nesta revalidação:** não repeti a prova em navegador real antes da hidratação (fica com o QA) e não confrontei o 02 linha a linha com as migrations. A configuração hospedada continua para a E9b.
+
 ## Pendências de segurança
 
-- **SEG-E45-03** (médio, aberto): Na E7, calcular o sha256 no servidor sobre o objeto enviado e conferi-lo antes de passar para STORED, recusando se divergir. Validar com um teste pgTAP ou de integração: registrar com um hash e enviar outro conteúdo deve falhar.
-- **SEG-E45-09** (baixo, aberto): Com aprovação do responsável (RAT-D012), trocar o literal na cópia arquivada por um marcador ou registrar o aceite. Se esse valor já foi usado em algum ambiente não local, trocar a senha lá.
-- **SEG-E45-12** (baixo, novo): Opcional, a critério do responsável (RAT-D020): reduzir jwt_expiry (por exemplo 900 s) ou, nas ações sensíveis futuras (E6+), conferir a sessão no Auth (getUser) em vez de só getClaims. Para validar, repetir logout.cjs: o cookie antigo deve dar 307 para /login depois do prazo escolhido.
+- **SEG-E45-03** (médio): **corrigido na E7** (hash calculado no servidor). O caminho direto pela RPC é o SEG-E8B-02, aceito pela RAT-D020.
+- **SEG-E8B-05** (baixo): **corrigido no checklist em 23/10/2026** (sem curinga). Falta conferir a tela URL Configuration na E9b.
+- **SEG-E45-09** (baixo): **encerrado em 23/10/2026.** O responsável confirmou que o valor nunca foi usado fora do ambiente local. A cópia arquivada fica como está (RAT-D012).
+- **SEG-E45-12** (baixo): **aceito pela RAT-D020 em 23/10/2026**, sem correção por ora. A recomendação era opcional: reduzir jwt_expiry (por exemplo 900 s) ou, nas ações sensíveis futuras (E6+), conferir a sessão no Auth (getUser) em vez de só getClaims.

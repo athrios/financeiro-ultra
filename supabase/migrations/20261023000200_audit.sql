@@ -58,7 +58,10 @@ create function private.set_audit_context(
 ) returns void
 language plpgsql set search_path = '' as $$
 begin
-  perform pg_catalog.set_config('app.audit_reason',      coalesce(pg_catalog.btrim(p_reason), ''), true);
+  -- RAT-D021: o motivo é opcional. Vazio ou só com espaços, tabs e quebras de linha vira "sem motivo"
+  -- (string vazia no GUC, NULL em audit_logs.reason). Quando informado, é gravado sem as bordas em branco.
+  perform pg_catalog.set_config('app.audit_reason',
+    coalesce(pg_catalog.btrim(p_reason, E' \t\r\n'), ''), true);
   perform pg_catalog.set_config('app.audit_source',      coalesce(p_source::text, ''), true);
   perform pg_catalog.set_config('app.correlation_id',    coalesce(p_correlation_id::text, ''), true);
   perform pg_catalog.set_config('app.audit_actor_label', coalesce(pg_catalog.btrim(p_actor_label), ''), true);
@@ -93,7 +96,7 @@ begin
     reason, source, correlation_id, actor_user_id, actor_role, actor_label, request_role)
   values (
     p_kind, p_entity, p_entity_id, p_action, p_previous, p_new,
-    nullif(current_setting('app.audit_reason', true), ''),
+    nullif(pg_catalog.btrim(current_setting('app.audit_reason', true), E' \t\r\n'), ''),
     coalesce(v_source_txt::public.audit_source,
              case when v_uid is not null then 'UI'
                   when v_jwt_role = 'service_role' then 'SYSTEM'
@@ -165,28 +168,14 @@ begin
 end;
 $$;
 
--- Ações que exigem motivo chamam esta função antes de escrever.
-create function private.require_audit_reason()
-returns text language plpgsql stable set search_path = '' as $$
-declare v_reason text := pg_catalog.btrim(coalesce(current_setting('app.audit_reason', true), ''));
-begin
-  if v_reason = '' then
-    raise exception 'Esta operação exige motivo.' using errcode = 'check_violation';
-  end if;
-  return v_reason;
-end;
-$$;
-
 revoke execute on function private.audit_insert(public.audit_kind, text, uuid, text, jsonb, jsonb) from public;
 revoke execute on function private.audit_row_change() from public;
 revoke execute on function private.audit_event(text, uuid, text, jsonb) from public;
 revoke execute on function private.set_audit_context(text, public.audit_source, uuid, text) from public;
-revoke execute on function private.require_audit_reason() from public;
--- RPCs SECURITY INVOKER (executadas como authenticated) chamam estas três.
+-- RPCs SECURITY INVOKER (executadas como authenticated) chamam estas duas.
 -- O schema private não é exposto pelo PostgREST: o cliente não as chama diretamente.
 grant execute on function private.audit_event(text, uuid, text, jsonb) to authenticated;
 grant execute on function private.set_audit_context(text, public.audit_source, uuid, text) to authenticated;
-grant execute on function private.require_audit_reason() to authenticated;
 
 create index audit_logs_entity_idx      on public.audit_logs (entity, entity_id, seq desc);
 create index audit_logs_actor_idx       on public.audit_logs (actor_user_id, seq desc) where actor_user_id is not null;

@@ -6,7 +6,7 @@
 | Etapa / gate | E3 · gate G2 |
 | Agente | `design-ui-ux` |
 | Data | 22/10/2026 (revisões das rodadas 2 e 3 em 22 e 23/10/2026) |
-| Entrada | Plano `01-plano.md` (revisão 7, de 23/10/2026; aprovado na revisão 6 em 22/10/2026), seções 4, 5, 6, 14 e handoff da seção 19; Brain 01, 04, 05, 09, 10, 11 e RN-009 a RN-015 (03/07); `02-modelagem-dados.md` (proposta para o G1, consultada na revisão desta rodada); componentes em `src/components/ui` e tela antiga em `src/app` (somente referência) |
+| Entrada | Plano `01-plano.md` (revisão 9, de 23/10/2026; aprovado na revisão 6 em 22/10/2026), seções 4, 5, 6, 14 e handoff da seção 19; Brain 01, 04, 05, 09, 10, 11 e RN-009 a RN-015 (03/07); `02-modelagem-dados.md` (proposta para o G1, consultada na revisão desta rodada); componentes em `src/components/ui` e tela antiga em `src/app` (somente referência) |
 | Escopo **implementado pela FND (E5)** | Shell "Financeiro Ultra" com navegação em placeholders, login, `/auth/confirm` e aceite de convite / definir senha, recuperação de senha, estados de acesso (2.7), páginas-placeholder (2.8), estados transversais do shell (carregando, erro, não encontrado, sessão expirada), responsividade e acessibilidade desses itens, e os critérios do QA correspondentes (seção 8.A) |
 | Escopo **só especificado (padrão para features futuras, PROPOSTA)** | Padrão de tabela financeira (2.9), apresentação de Recebido / Devido / Saldo (2.10), padrão de confirmação (5.1), campos monetários (5.3), componentes financeiros (3.3) e critérios UX-23 a UX-33, UX-35 a UX-41, UX-43, UX-44 e UX-54 (seção 8.B). Estão no plano como entrega da especificação (seção 19), **não** como código da E5 e **não** entram nos critérios de aceite da FND (CA-14 a CA-16) sem aprovação do responsável (U-02, seção 9.4) |
 | Fora do escopo | Telas de features futuras (cadastros, competências, recebimentos, rateio, apuração, compensações, liquidação, importação, OCR, dashboards). Aqui existe apenas o **espaço na navegação** e o **padrão** que elas devem seguir |
@@ -201,7 +201,7 @@ Prioridade dos blocos: **(1)** identificação e contexto (onde estou, quem sou)
 └───────────────┴───────────────────────────────────────────────────────┘
 ```
 
-- Barra lateral fixa de 256 px, com rolagem própria se o menu exceder a altura. Sem modo recolhido na FND (PROPOSTA; reavaliar quando houver telas largas).
+- Barra lateral fixa de 272 px (17rem; D-E5-11: evita rolagem horizontal do menu quando a barra vertical da janela aparece), com rolagem própria se o menu exceder a altura. Sem modo recolhido na FND (PROPOSTA; reavaliar quando houver telas largas).
 - Cabeçalho de página: `h1` único, descrição de uma linha, ações da página à direita (máximo uma ação primária visível) e, abaixo, a **faixa de contexto** (competência) como espaço reservado para as features que dependem dela. Na FND a faixa não é exibida.
 - Largura do conteúdo: tabelas usam toda a largura disponível; formulários e cartões de leitura, `max-w-2xl`.
 - **Aviso de ambiente** (PROPOSTA): em `APP_ENV` diferente de `production`, faixa fixa no topo do conteúdo com texto "Ambiente de testes — use apenas dados fictícios" (tom `warning`, com ícone). Em produção não aparece. Motivo: o plano admite Preview e Production compartilhando o mesmo banco enquanto não houver dados reais (R-17); a faixa evita confundir teste com produção.
@@ -280,7 +280,6 @@ O detalhe por papel de cada módulo é fechado na feature correspondente. A matr
 | Falha de rede ou servidor | `danger` | "Não foi possível entrar agora. Tente novamente em instantes." |
 | Credenciais certas, sem perfil ativo | — (sem mensagem no login) | O login **conclui** e a pessoa vai à tela 2.7.1, pela regra única de acesso (J1). A sessão não é encerrada. O texto atual do código ("Procure o financeiro") deixa de existir (9.2, P-6) |
 | Sessão expirada (vindo de J6; indicador `aviso=sessao-expirada` no redirecionamento do proxy, 4.8) | `info` | "Sua sessão expirou. Entre novamente para continuar." |
-| Senha redefinida / convite concluído e usuário voltou ao login | `success` | "Senha definida. Entre com a nova senha." (usado só se o fluxo terminar sem sessão) |
 
 **Comportamento:** Enter envia; durante o envio, o botão fica desabilitado com o texto "Entrando…" e um indicador; a senha é limpa após falha; o foco permanece no campo de senha; o `Alert` com `role="alert"` anuncia o erro sem mover o foco. Um papel Sócio ativo **entra normalmente** (CA-06: autentica) e cai em 2.7.3; quem não tem perfil ativo entra e cai em 2.7.1.
 
@@ -304,8 +303,9 @@ Mesma tela para dois modos, trocando apenas título e descrição (o modo vem do
 - Campos: **Nova senha** e **Confirmar nova senha**, ambos com mostrar/ocultar; `autoComplete="new-password"`.
 - A **regra de senha** aparece como texto de ajuda **antes** de qualquer erro, em lista curta, com marcação de cumprimento ao digitar (ícone + texto "cumprido" / "pendente", anunciado com `aria-live="polite"` sem repetir a cada tecla). O valor mínimo e as demais exigências são definidos pela `seguranca` e pelo `desenvolvedor` (DECISÃO PENDENTE, ver 9.4). Recomendação de design: aceitar frases longas e colar do gerenciador de senhas; não obrigar combinações arbitrárias de caracteres.
 - Validação: ao enviar (não a cada tecla), com mensagem por campo: "A senha ainda não atende às regras." / "As senhas não coincidem."
+- **Idade do link (D-E5-13):** se passaram mais de 15 min desde o clique no link de convite ou recuperação, a rota mostra o estado "Sessão expirada" mesmo com a sessão ainda válida, com "Solicitar novo link". O limite de 15 min é proposta, ajustável no código (`LINK_SESSION_MAX_AGE_SECONDS`); o e-mail da conta não é mostrado (mascarado) nesta tela, por decisão de uso interno (RAT-D020; SEG-E45-11 descartado).
 - **Sem sessão** ao abrir a rota: tela de erro com "Sua sessão para definir a senha expirou. Solicite um novo link." e o botão "Solicitar novo link" → `/recuperar-senha`.
-- **Sucesso:** a própria página troca o formulário por um estado de sucesso (`role="status"`, foco movido para o título): ícone de confirmação, título "Senha definida", texto "Sua senha foi salva." e o botão "Ir para o Financeiro Ultra". Não se usa toast para esta confirmação.
+- **Sucesso:** a própria página troca o formulário por um estado de sucesso (`role="status"`, foco movido para o título): ícone de confirmação, título "Senha definida", texto "Sua senha foi salva." e o botão "Ir para o Financeiro Ultra". Não se usa toast para esta confirmação. A tela seguinte (login ou Dashboard) **não repete** o status "Senha definida": a confirmação vive só nesta página, e o login não tem mais aviso de senha definida.
 - Se o convite expirou antes do aceite, o aviso da tela de erro (4.6) orienta a pedir um novo convite ao Administrador. Se a recuperação por e-mail funciona para usuário ainda não confirmado é uma pergunta técnica ao `desenvolvedor` (9.4).
 
 ### 2.6 Recuperação de senha (`/recuperar-senha`)
@@ -349,7 +349,7 @@ Estes estados valem para **qualquer** rota de `(app)` e usam o **shell mínimo**
 
 ### 2.8 Dashboard e páginas-placeholder na FND
 
-- **Dashboard (`/`)**: `h1` "Dashboard"; saudação curta "Olá, {nome}" com o papel; um único estado vazio informativo: ícone do módulo, título "Os indicadores aparecerão aqui", texto "Quando os módulos de recebimentos, apuração e compensações forem liberados, este painel mostrará o que exige a sua decisão." Sem números fictícios, sem gráficos.
+- **Dashboard (`/`)**: `h1` "Dashboard"; saudação curta "Olá, {nome}" com o papel; um único estado vazio informativo: ícone do módulo, título "O resumo da competência aparecerá aqui", texto "Quando os módulos de recebimentos, apuração e compensações forem liberados, este painel mostrará o que exige a sua decisão." Sem números fictícios, sem gráficos.
 - **Cada módulo do menu** (placeholder): `h1` com o nome do módulo; estado vazio com o ícone do módulo, título "Módulo ainda não disponível", texto "Esta área será liberada em uma próxima etapa do Financeiro Ultra.", ação "Voltar ao Dashboard".
 - Dashboards futuros devem priorizar decisão: primeiro o que exige ação (comprovantes em revisão, compensações pendentes, clientes pendentes — Brain 05), depois os totais. Fica registrado como diretriz, sem desenho (fora do escopo).
 
@@ -537,7 +537,7 @@ Somente o que sustenta o shell, a autenticação, os estados de acesso e os plac
 | `CentAdjustMark` | Marca `‡` e nota do centavo de ajuste |
 | `StatusBadge` | Selo com ícone e texto; mapeia tom → variante. Estados de competência (aberta, em conferência, apurada, liquidada) e demais estados são definidos pelas features |
 | `ConfirmActionDialog` | Diálogo de confirmação em três níveis (5.1) |
-| `ReasonField` | Campo de motivo obrigatório (usa `Textarea`) |
+| `ReasonField` | Campo "Motivo (opcional)" (usa `Textarea`); o valor é gravado quando informado e a ação não é bloqueada sem ele (RAT-D021) |
 
 **Gerados pelo CLI do shadcn para essas features** (`@base-ui/react` 1.8.0 inclui `alert-dialog`, `field`, `form`, `tooltip`, `checkbox`; o `desenvolvedor` da feature confirma se há nova dependência): `AlertDialog` (confirmações), `Textarea` (motivo), `Checkbox` (checklists de confirmação) e, só se necessário, `Tooltip`. O `Toast` do Base UI **não** é usado para confirmações financeiras (5.2).
 
@@ -611,7 +611,7 @@ Pendência significa "há algo esperando uma pessoa", não erro. Na FND só se a
 |---|---|---|
 | Por papel | A ação nunca será possível para o papel | **Ocultar** o controle. Se a pessoa chegar à área, 2.7.4 |
 | Por condição | O papel pode, mas o estado atual não permite | Mostrar o botão **desabilitado com `focusableWhenDisabled`** e o motivo em texto visível ao lado ou abaixo ("Disponível depois da apuração") ligado por `aria-describedby`. Não depender de tooltip |
-| Registro imutável | Competência liquidada (RN-014, Brain 09) | Faixa permanente no topo do conteúdo: ícone `lock`, "Competência liquidada — somente leitura. Correções exigem reabertura por um Administrador, com motivo registrado." Controles de edição omitidos; para o Administrador, a ação "Reabrir competência" visível (5.1) |
+| Registro imutável | Competência liquidada (RN-014, Brain 09) | Faixa permanente no topo do conteúdo: ícone `lock`, "Competência liquidada — somente leitura. Correções exigem reabertura por um Administrador, com motivo registrado, quando informado." Controles de edição omitidos; para o Administrador, a ação "Reabrir competência" visível (5.1) |
 | Inconsistência | Soma dos saldos ≠ 0 (2.10.6), **somente para a liquidação** (Brain 09, "Para liquidar", item 4) | `Alert` `danger` + ação de **liquidar** bloqueada com o motivo. O efeito sobre a apuração é DECISÃO PENDENTE da feature Apuração |
 | Conflito | O estado mudou desde que a tela foi aberta | Dentro do diálogo/ação: `Alert` `warning` "Esta {competência} foi alterada por outra pessoa enquanto você revisava. Recarregue os dados antes de continuar." e botão "Recarregar dados" |
 
@@ -661,7 +661,7 @@ Redireciona ao login com o aviso `info` de 2.4, mostrado quando o redirecionamen
 |---|---|---|---|
 | 1 | Reversível, sem efeito financeiro durável | Filtrar, abrir detalhe, "Sair" | Nenhuma. Feedback imediato |
 | 2 | Altera dado financeiro, auditada, corrigível por novo ato | Confirmar um recebimento a partir de comprovante, apurar competência (a nova apuração substitui a anterior com histórico — Brain 09), marcar compensação como paga | Diálogo com resumo do impacto e botão com verbo específico |
-| 3 | Alto impacto: trava dados, desfaz trava ou apaga logicamente | Liquidar competência (RN-014), reabrir competência (Brain 09, somente Administrador, com motivo), excluir/cancelar recebimento (auditoria obrigatória — Brain 10) | Diálogo com resumo do impacto, checagem de pré-condições, **confirmação deliberada** (digitar o identificador) e, quando o Brain exigir, **motivo obrigatório** |
+| 3 | Alto impacto: trava dados, desfaz trava ou apaga logicamente | Liquidar competência (RN-014), reabrir competência (Brain 09, somente Administrador, com motivo), excluir/cancelar recebimento (auditoria obrigatória — Brain 10) | Diálogo com resumo do impacto, checagem de pré-condições, **confirmação deliberada** (digitar o identificador) e campo **Motivo (opcional)**, gravado quando informado (RAT-D021); a auditoria de quem, o que, quando e de onde continua obrigatória |
 
 A classificação final de cada ação é revisada na feature correspondente; esta tabela fixa o padrão e os exemplos. Dados financeiros não são excluídos fisicamente (plano, 7.1): "excluir" é uma inativação/cancelamento lógico e o vocabulário final é da feature.
 
@@ -669,9 +669,9 @@ A classificação final de cada ação é revisada na feature correspondente; es
 
 1. **Título** com o verbo e o objeto: "Liquidar competência 10/2026?".
 2. **Resumo do impacto** em lista curta e em números, vindos do servidor: competência, quantidade de recebimentos, total recebido, total devido, soma dos saldos, compensações pagas/justificadas. Os valores seguem o padrão de 2.10.
-3. **Consequência em linguagem simples**, por exemplo: "Depois de liquidar, os recebimentos desta competência não poderão ser alterados diretamente. Para corrigir, será preciso reabri-la (somente Administrador, com motivo registrado)."
+3. **Consequência em linguagem simples**, por exemplo: "Depois de liquidar, os recebimentos desta competência não poderão ser alterados diretamente. Para corrigir, será preciso reabri-la (somente Administrador, com motivo registrado quando informado)."
 4. **Pré-condições** (nível 3) como checklist de leitura (ícone + texto, atendido/não atendido). Se alguma não for atendida, o botão de confirmar fica bloqueado com o motivo escrito (4.7) e o diálogo oferece o caminho para resolver.
-5. **Confirmação deliberada** (nível 3): campo "Digite 10/2026 para confirmar", com o identificador exato da competência. A comparação não diferencia espaços nas pontas. Para reabertura, somam-se o campo **Motivo** (obrigatório, com contador; mínimo de caracteres definido na feature — P-21) e a nota de que usuário, data/hora, motivo, estado anterior e impacto serão registrados (Brain 09).
+5. **Confirmação deliberada** (nível 3): campo "Digite 10/2026 para confirmar", com o identificador exato da competência. A comparação não diferencia espaços nas pontas. Para reabertura, somam-se o campo **Motivo (opcional)** (com contador; não bloqueia a ação, RAT-D021; P-21 sobre mínimo de caracteres fica sem efeito) e a nota de que usuário, data/hora, motivo, estado anterior e impacto serão registrados (Brain 09).
 6. **Rodapé**: "Cancelar" (à esquerda ou como primeiro foco) e o botão de confirmação à direita, com **rótulo específico** ("Liquidar competência"), nunca "OK" ou "Sim".
 7. **Estilo do botão**: `destructive` somente para ação que apaga/cancela; liquidar, apurar e reabrir usam o botão primário, pois não são destruição. Vermelho não vira decoração.
 
@@ -679,7 +679,7 @@ A classificação final de cada ação é revisada na feature correspondente; es
 
 - Foco inicial: no **Cancelar** (níveis 2 e 3), para que Enter acidental não confirme. No nível 3, a ordem de tabulação percorre resumo, campos e termina no botão de confirmar.
 - Esc e clique no fundo cancelam, **exceto** enquanto a ação está em andamento. Foco preso dentro do diálogo; ao fechar, o foco volta ao elemento que o abriu (ou ao título, se esse elemento deixou de existir).
-- O botão de confirmar só habilita quando as condições são atendidas (campo digitado igual, motivo preenchido, checklist ok). Ao acionar, fica desabilitado com "Liquidando…" até a resposta, impedindo duplo envio (a idempotência no servidor é pedido ao `desenvolvedor`, 9.4).
+- O botão de confirmar só habilita quando as condições são atendidas (campo digitado igual e checklist ok; o motivo é opcional). Ao acionar, fica desabilitado com "Liquidando…" até a resposta, impedindo duplo envio (a idempotência no servidor é pedido ao `desenvolvedor`, 9.4).
 - Erro do servidor: o diálogo permanece aberto, com `Alert` `danger` no topo (mensagem esperada em português; erro inesperado com código de suporte) e os dados digitados preservados. Conflito: ver 4.7.
 - Sucesso: fecha o diálogo e atualiza a página com resultado **persistente** — selo "Liquidada", data/hora, usuário e, se houver, link para o histórico/auditoria. O foco vai ao título da página; uma região `role="status"` anuncia o resultado.
 - Em telas pequenas o diálogo ocupa a largura útil, com rodapé de ações fixo e conteúdo rolável.
@@ -728,7 +728,7 @@ Na FND valem as linhas de navegação, cabeçalho de página, cartões de auth, 
 
 | Elemento | Mobile (< 768) | Tablet (768–1023) | Desktop (≥ 1024) |
 |---|---|---|---|
-| Navegação | Barra superior + painel lateral | Barra superior + painel lateral | Barra lateral fixa de 256 px |
+| Navegação | Barra superior + painel lateral | Barra superior + painel lateral | Barra lateral fixa de 272 px |
 | Cabeçalho de página | Ação primária em largura total abaixo do título | Título e ação na mesma linha | Título à esquerda, ações à direita |
 | Cartões de auth | Largura útil com margem de 16 px, alinhados ao topo (não ao centro) quando o teclado virtual abre | Centralizado, 384 px | Centralizado, 384 px |
 | Alvos de toque | Botões e campos de 44 px | 40 a 44 px | 32 a 36 px (padrão do tema) |
@@ -826,7 +826,7 @@ Cada item é verificável por inspeção, teste manual guiado ou teste automatiz
 | UX-09 | Papel Sócio ativo consegue entrar e vê o estado 2.7.3, sem menu de módulos e sem nenhum dado de negócio | A |
 | UX-10 | Recuperação: a resposta é idêntica para e-mail existente e inexistente; reenvio respeita o cooldown e o texto informa o tempo | A |
 | UX-11 | `/definir-senha` sem sessão mostra a tela de sessão expirada com "Solicitar novo link"; com sessão, mostra o modo correto (convite ou recuperação) | A |
-| UX-12 | A regra de senha é exibida antes do erro; senhas diferentes e senha fora da regra mostram mensagem por campo; sucesso exibe "Senha definida" com foco no título | A |
+| UX-12 | A regra de senha é exibida antes do erro; senhas diferentes e senha fora da regra mostram mensagem por campo; sucesso exibe "Senha definida" com foco no título e a tela seguinte não repete o status | A |
 | UX-13 | Link inválido ou expirado mostra 4.6 com as duas ações | A |
 | UX-14 | Os campos têm `autocomplete` corretos (`username`, `current-password`, `new-password`) e aceitam colar | A |
 | UX-15 | Mostrar/ocultar senha tem nome acessível e `aria-pressed` | A |
@@ -887,7 +887,7 @@ Cada item é verificável por inspeção, teste manual guiado ou teste automatiz
 |---|---|---|
 | UX-36 | O diálogo de confirmação do nível 3 tem título com verbo e objeto, resumo do impacto, consequência em texto, checklist de pré-condições, campo de confirmação digitada e botão com rótulo específico (nunca "OK") | M |
 | UX-37 | O foco inicial do diálogo está no "Cancelar"; Esc e clique no fundo cancelam; durante o processamento, não cancelam e o botão fica desabilitado (sem duplo envio) | A |
-| UX-38 | O botão de confirmar só habilita com identificador digitado igual, motivo preenchido (quando exigido) e pré-condições atendidas; o motivo do bloqueio é lido por leitor de tela | A |
+| UX-38 | O botão de confirmar só habilita com identificador digitado igual, pré-condições atendidas; o motivo do bloqueio é lido por leitor de tela | A |
 | UX-39 | Em falha, o diálogo permanece aberto com a mensagem e os dados preservados; em sucesso, o resultado é persistente na página (selo, data, usuário) e o foco vai ao título | M |
 | UX-40 | O botão `destructive` só é usado para ação que apaga ou cancela | M |
 | UX-41 | Sessão expirada ou estado alterado durante a confirmação não exibe sucesso; leva ao login ou mostra o conflito de 4.7 | M |
@@ -997,6 +997,21 @@ Condições para a E5: o `desenvolvedor` seguirá as seções 2 a 7 (itens [FND]
 ---
 
 ## Histórico de revisão
+
+### Alinhamento pós-E5 (23/10/2026): implementação, RAT-D020 e RAT-D021
+
+Só este arquivo foi alterado; nenhuma proposta virou decisão. Alinhado a `04-implementacao.md` (E5 e correções pós-validação E4/E5).
+
+| # | Item | Tratamento | Onde |
+|---|---|---|---|
+| 1 | Vocabulário (RAT-D017, UX-02) | Título do estado vazio do Dashboard passa a "O resumo da competência aparecerá aqui" | 2.8 |
+| 2 | D-E5-11 | Barra lateral de 272 px (17rem) | 2.2, 6 |
+| 3 | D-E5-13 | Link de convite/recuperação com mais de 15 min desde o clique mostra "Sessão expirada" (limite proposto, ajustável) | 2.5.2 |
+| 4 | D-E5-12 revertido (RAT-D020) | Sem e-mail de aviso de senha alterada; a spec não prevê esse e-mail | 2.5.2 (nada a mostrar) |
+| 5 | SEG-E45-11 descartado (RAT-D020) | E-mail mascarado em `/definir-senha` fora do escopo | 2.5.2 |
+| 6 | RAT-D021 | Campo de motivo é "Motivo (opcional)" e não bloqueia a ação; auditoria segue obrigatória | 3, 5.1, 4.7, 8.B (UX-38) |
+| 7 | Pós-definição de senha | A tela seguinte não mostra o status antigo; removida a linha de aviso "Senha definida" do login | 2.4, 2.5.2, UX-12 |
+
 
 ### Rodada 3, complemento (23/10/2026): observação nova da revisão independente (baixa), sobre o redirecionamento do proxy
 

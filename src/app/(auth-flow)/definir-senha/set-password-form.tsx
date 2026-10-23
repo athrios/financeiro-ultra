@@ -1,7 +1,6 @@
 "use client";
 
 import { CircleCheck, Loader2 } from "lucide-react";
-import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 
 import { FormMessage } from "@/components/auth/form-message";
@@ -54,9 +53,16 @@ export function SetPasswordForm({ mode }: { mode: PasswordMode }) {
           </h1>
           <p className="text-sm text-muted-foreground">Sua senha foi salva.</p>
         </div>
-        <Link href="/" className={cn(buttonVariants(), "h-11 w-full md:h-9")}>
+        {/*
+          Navegação de documento (não <Link>) de propósito: com cacheComponents o roteador do cliente
+          mantém a tela anterior oculta no DOM (Activity), e o status "Senha definida" ficava
+          carregado atrás de "Sem acesso ativo" (achado do QA). A navegação completa descarta o
+          estado antigo e ainda recarrega a sessão que acabou de mudar (nova senha).
+        */}
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+        <a href="/" className={cn(buttonVariants(), "h-11 w-full md:h-9")}>
           Ir para o Financeiro Ultra
-        </Link>
+        </a>
       </CardContent>
     );
   }

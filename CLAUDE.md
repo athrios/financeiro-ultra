@@ -18,7 +18,7 @@ A fonte de verdade funcional está em `brain-mensalidades-rateio/`.
 
 ## Feature em andamento
 
-FND-001 (Fundação): `docs/features/FND-001-fundacao/`. O plano aprovado é `01-plano.md` (revisão 8); o registro de implementação é `04-implementacao.md`. Não edite o plano nem o Brain sem pedido explícito do responsável.
+FND-001 (Fundação): `docs/features/FND-001-fundacao/`. O plano aprovado é `01-plano.md` (revisão 10); o registro de implementação é `04-implementacao.md`. Não edite o plano nem o Brain sem pedido explícito do responsável.
 
 ## Decisões vigentes que afetam o código (resumo)
 
@@ -28,6 +28,7 @@ FND-001 (Fundação): `docs/features/FND-001-fundacao/`. O plano aprovado é `01
 - Seeds, testes e exemplos usam **somente nomes fictícios** (RAT-D019).
 - O código antigo fica como referência; nada é removido sem aprovação (RAT-D012).
 - Sistema de uso interno (RAT-D020): fica o básico de segurança (login só por convite, papéis garantidos no banco, auditoria, comprovantes em área privada, segredos fora do código). Não acrescente camadas extras (CAPTCHA, limite próprio de tentativas, CSP mais rígida, e-mails de aviso) sem pedido do responsável.
+- Motivo opcional nas ações auditadas (RAT-D021): grave o motivo quando informado e não bloqueie a ação sem ele. A auditoria em si continua obrigatória (RAT-D009).
 - Pasta `.acessos/` contém credenciais pessoais: não leia, não edite, não versione.
 
 ## Subagentes especializados

@@ -46,9 +46,9 @@ select set_config('request.jwt.claims', '{"sub":"f1000000-0000-4000-8000-0000000
 select is((select count(*) from public.partners where name like 'Sócio Teste%'), 2::bigint, 'ADMINISTRATOR lê partners');
 select is((select count(*) from public.profiles where id::text like 'f1000000-%'), 6::bigint, 'ADMINISTRATOR lê todos os perfis (não só o próprio)');
 select cmp_ok((select count(*) from public.audit_logs), '>', 0::bigint, 'ADMINISTRATOR lê a auditoria');
-select is((select count(*) from public.proof_files), 1::bigint, 'ADMINISTRATOR lê proof_files');
+select is((select count(*) from public.proof_files where uploaded_by::text like 'f1000000-%'), 1::bigint, 'ADMINISTRATOR lê proof_files');
 select throws_ok($$update public.profiles set role = 'VIEWER' where id = 'f1000000-0000-4000-8000-000000000002'$$,
-  '42501', null, 'ADMINISTRATOR não altera perfis pela API (só pelo procedimento com motivo)');
+  '42501', null, 'ADMINISTRATOR não altera perfis pela API (só pelo procedimento auditado)');
 select throws_ok($$insert into public.partners (name) values ('Novo')$$,
   '42501', null, 'ADMINISTRATOR não grava partners pela API na FND');
 select throws_ok($$delete from public.profiles where id = 'f1000000-0000-4000-8000-000000000002'$$,
@@ -64,7 +64,7 @@ select set_config('request.jwt.claims', '{"sub":"f1000000-0000-4000-8000-0000000
 select is((select count(*) from public.partners where name like 'Sócio Teste%'), 2::bigint, 'OPERATOR lê partners');
 select is((select count(*) from public.profiles), 1::bigint, 'OPERATOR lê apenas o próprio perfil');
 select is((select count(*) from public.audit_logs), 0::bigint, 'OPERATOR não lê a auditoria');
-select is((select count(*) from public.proof_files), 1::bigint, 'OPERATOR lê proof_files');
+select is((select count(*) from public.proof_files where uploaded_by::text like 'f1000000-%'), 1::bigint, 'OPERATOR lê proof_files');
 select throws_ok($$update public.profiles set role = 'ADMINISTRATOR' where id = 'f1000000-0000-4000-8000-000000000002'$$,
   '42501', null, 'OPERATOR não se autopromove');
 select throws_ok($$insert into public.audit_logs (kind, entity, entity_id, action, source, request_role)
@@ -81,7 +81,7 @@ select set_config('request.jwt.claims', '{"sub":"f1000000-0000-4000-8000-0000000
 select is((select count(*) from public.partners where name like 'Sócio Teste%'), 2::bigint, 'VIEWER lê partners');
 select is((select count(*) from public.profiles), 1::bigint, 'VIEWER lê apenas o próprio perfil');
 select is((select count(*) from public.audit_logs), 0::bigint, 'VIEWER não lê a auditoria');
-select is((select count(*) from public.proof_files), 1::bigint, 'VIEWER lê proof_files (M-04: segue a matriz aprovada)');
+select is((select count(*) from public.proof_files where uploaded_by::text like 'f1000000-%'), 1::bigint, 'VIEWER lê proof_files (M-04: segue a matriz aprovada)');
 select throws_ok($$select * from public.register_proof_file(repeat('b', 64), 'application/pdf', 10, 'x.pdf')$$,
   '42501', null, 'VIEWER não registra comprovante');
 

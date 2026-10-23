@@ -5,10 +5,10 @@
 | Feature | FND-001 — Fundação |
 | Etapa / gate | E2 / G1 |
 | Agente | `modelagem-dados` |
-| Data | 22/10/2026 (revisão 3 em 23/10/2026) |
-| Entrada | `01-plano.md` (revisão 7; aprovado em 22/10/2026, com o ajuste D-01 aceito; a revisão 7 só muda a sequência E4/E5 e não altera este modelo); Brain 00, 02, 03, 04, 05, 06, 07, 08, 09, 10 e 11 (com as notas de revisão de 22/10); `supabase/migrations/20261007000100` a `0700` (só como referência de padrões); `src/domain/shared` e `src/domain/distribution` (primitivas) |
+| Data | 22/10/2026 (revisão 3 em 23/10/2026; revisão 4, sincronização com a linha de base implementada, em 23/10/2026) |
+| Entrada | `01-plano.md` (revisão 9; aprovado em 22/10/2026, com o ajuste D-01 aceito); Brain 00, 02, 03, 04, 05, 06, 07, 08, 09, 10 e 11 (RAT-D001 a RAT-D021, inclusive RAT-D020 "uso interno" e RAT-D021 "motivo opcional"); migrations implementadas `supabase/migrations/20261023000100` a `20261023000500`; divergências registradas em `04-implementacao.md` (D-E4-01 a D-E4-13, D-E7-01 a D-E7-07, D-E8-09) e achados de `05-seguranca.md`; `src/domain/shared` e `src/domain/distribution` (primitivas). As migrations de 07/10 só como referência histórica (arquivadas em `docs/legado/07-10/`) |
 | Escopo da DDL | **Somente o transversal da FND**: papéis e perfis (com `partner_id` opcional), tabela mínima `partners` (exigida pela FK), auditoria estendida, `proof_files` e bucket de comprovantes. Nenhuma DDL de rateio, cliente, competência ou recebimento |
-| Status | Proposta para o gate G1, **revisão 3** (correções da segunda rodada da revisão independente; ver "Histórico de revisão" ao final). Nenhuma migration foi criada e nenhum código foi alterado (a implementação é a E4/E7) |
+| Status | **Linha de base implementada** (E4, E7 e E8, validadas). **Revisão 4**: o texto e a DDL da seção 3 foram sincronizados com as migrations `20261023000100` a `20261023000500`, que passam a ser a **fonte da DDL**; em qualquer diferença entre este documento e as migrations, valem as migrations, e a diferença deve ser corrigida aqui. Gate G1 aprovado na revisão 3. O modelo conceitual das features (seção 2.4) continua proposta (ver "Histórico de revisão" ao final) |
 
 ## Como ler as classificações
 
@@ -63,9 +63,9 @@ Documentos do Brain em `status: draft` (06, 08, 10) são **insumo**, citados com
 | # | Fragilidade | Evidência | Tratamento |
 |---|---|---|---|
 | F-01 | Papel padrão de usuário novo é um papel de negócio (`SOCIO`) | `private.handle_new_user` | Usuário novo nasce **sem papel** (`role` nulo = nenhum acesso) |
-| F-02 | Administrador altera papéis pela API, sem motivo e sem proteção contra ficar sem Administrador | política `profiles_update_admin` | Sem `UPDATE` direto na FND; mudança só por procedimento auditado com motivo obrigatório; trava do último Administrador |
+| F-02 | Administrador altera papéis pela API, sem motivo e sem proteção contra ficar sem Administrador | política `profiles_update_admin` | Sem `UPDATE` direto na FND; mudança só por procedimento auditado (motivo opcional, gravado quando informado: RAT-D021); trava do último Administrador |
 | F-03 | `created_at` da auditoria usa `now()`, igual para todos os eventos da transação; sem ordem total | `audit_logs.created_at default now()` | `seq` (identity) + `created_at` com `clock_timestamp()` (mesmo nome do plano 9, só muda o padrão) + `tx_id` |
-| F-04 | `TRUNCATE` na auditoria só é barrado por `REVOKE` para `authenticated` | `0700` | Trigger `BEFORE TRUNCATE` |
+| F-04 | `TRUNCATE` na auditoria só é barrado por `REVOKE` para `authenticated` | `0700` | Trigger `BEFORE TRUNCATE` em `audit_logs`, `partners`, `profiles` e `proof_files`, e `TRUNCATE` revogado de `anon`, `authenticated` e `service_role` em todo `public` (inclusive nos default privileges) — D-E4-12 |
 | F-05 | Ações semânticas deduzidas por `CASE` fixo no trigger genérico (acoplamento a nomes de colunas) | `audit_row_change` | Eventos semânticos gravados explicitamente pelas RPCs (`private.audit_event`) |
 | F-06 | A auditoria copia a linha inteira, inclusive dados pessoais e extrações de OCR | `to_jsonb(new)` | Lista de colunas redigidas por tabela (argumento do trigger) |
 | F-07 | Endurecimento de privilégios por exclusão (revoga alguns) | `0700` | Lista de permissões explícita (revoga tudo e concede por tabela/coluna) |
@@ -234,11 +234,11 @@ Sócio inativado ainda indicado em cliente ativo: [PENDENTE] M-02 (proposta: blo
 | `current_calculation_id` | FK anulável | apuração vigente | [PROPOSTA] |
 | `created_at`, `updated_at` | | | |
 
-Transições [PROPOSTA] (detalhe em P-21): `OPEN → IN_REVIEW → CALCULATED → SETTLED`; `IN_REVIEW → OPEN` (devolver); `CALCULATED → IN_REVIEW` (invalida a apuração, que vira `SUPERSEDED`); `SETTLED → OPEN` somente por **reabertura** do Administrador, com motivo ([OFICIAL] Brain 09, RN-014).
+Transições [PROPOSTA] (detalhe em P-21): `OPEN → IN_REVIEW → CALCULATED → SETTLED`; `IN_REVIEW → OPEN` (devolver); `CALCULATED → IN_REVIEW` (invalida a apuração, que vira `SUPERSEDED`); `SETTLED → OPEN` somente por **reabertura** do Administrador ([OFICIAL] Brain 09, RN-014), com motivo **opcional**, gravado quando informado ([OFICIAL] RAT-D021, que cita a reabertura).
 
 #### `competence_status_events` — Feature Competências
 
-`id`, `competence_id`, `from_status`, `to_status`, `occurred_at`, `actor_user_id`, `reason` (obrigatório na reabertura e nas voltas de estado), `calculation_id` (anulável). Append-only. [PROPOSTA]. Complementa a auditoria com consulta direta do ciclo de vida.
+`id`, `competence_id`, `from_status`, `to_status`, `occurred_at`, `actor_user_id`, `reason` (anulável; gravado quando informado, nunca exigido: [OFICIAL] RAT-D021; texto em branco vira `NULL`, como na FND), `calculation_id` (anulável). Append-only. [PROPOSTA]. Complementa a auditoria com consulta direta do ciclo de vida.
 
 #### `receipts` — Recebimento · Feature Recebimentos
 
@@ -319,7 +319,7 @@ Critério de minimização e liquidação parcial: [PENDENTE] P-22.
 
 #### `competence_reopenings` — Reabertura · Feature Liquidação
 
-`id`, `competence_id`, `settlement_id` (a liquidação reaberta), `reopened_at` (relógio do servidor), `reopened_by` (Administrador), `reason` (obrigatório), `previous_status` (`SETTLED`), `impact` (`jsonb`). [OFICIAL] Brain 09 (usuário, data/hora, motivo, estado anterior, impacto financeiro). O conteúdo de "impacto financeiro" no momento da reabertura (quando a nova apuração ainda não existe): [PENDENTE] P-21 — proposta: registrar na reabertura o snapshot invalidado e, na liquidação seguinte, o diff por sócio entre as duas apurações.
+`id`, `competence_id`, `settlement_id` (a liquidação reaberta), `reopened_at` (relógio do servidor), `reopened_by` (Administrador), `reason` (anulável: gravado quando informado, não exigido), `previous_status` (`SETTLED`), `impact` (`jsonb`). [OFICIAL] Brain 09 (usuário, data/hora, motivo, estado anterior, impacto financeiro) + [OFICIAL] RAT-D021 (motivo opcional na reabertura; a aplicação à reabertura é leitura do orquestrador apresentada ao responsável, como registra a própria RAT-D021). O conteúdo de "impacto financeiro" no momento da reabertura (quando a nova apuração ainda não existe): [PENDENTE] P-21 — proposta: registrar na reabertura o snapshot invalidado e, na liquidação seguinte, o diff por sócio entre as duas apurações.
 
 #### `profiles` — Usuário · **FND** (seção 3.3)
 
@@ -347,17 +347,19 @@ Critério de minimização e liquidação parcial: [PENDENTE] P-22.
 
 ## 3. DDL proposta da FND
 
-**Escopo:** só o transversal (plano 14, E2/E4/E7). Os blocos abaixo são **proposta para revisão**; o desenvolvedor os transforma em migrations na E4/E7, com pgTAP. Nenhum objeto tem `organization_id` ([OFICIAL] RAT-D010). Toda a seção é [PROPOSTA], salvo onde indicado.
+**Escopo:** só o transversal (plano 14, E2/E4/E7). Nenhum objeto tem `organization_id` ([OFICIAL] RAT-D010). A forma é [PROPOSTA] aprovada no G1, salvo onde indicado.
 
-Arquivos sugeridos (a data real é a da E4; o prefixo `AAAAMMDD` é ilustrativo):
+**Situação (revisão 4):** a DDL abaixo foi **implementada** nas migrations da tabela seguinte e está sincronizada com elas. As migrations são a fonte: os blocos desta seção são o retrato comentado do que existe, para orientar as próximas features. Blocos longos que não mudaram de comportamento podem aparecer resumidos; o corpo completo está na migration indicada. As divergências da implementação incorporadas nesta revisão estão em 11.1.
 
-| Ordem | Arquivo | Conteúdo |
+| Ordem | Arquivo implementado | Conteúdo |
 |---|---|---|
-| 1 | `AAAAMMDD000100_base.sql` | schema `private`, enums, utilitários reaproveitados |
-| 2 | `AAAAMMDD000200_audit.sql` | `audit_logs`, contexto de auditoria, trigger genérico, eventos semânticos |
-| 3 | `AAAAMMDD000300_access.sql` | `partners` (mínima), `profiles`, trigger do Auth, funções de autorização, guardas, procedimentos de acesso e bootstrap |
-| 4 | `AAAAMMDD000400_proof_files.sql` | `proof_files`, RPCs de envio, bucket `proofs` e políticas de `storage.objects` |
-| 5 | `AAAAMMDD000500_privileges.sql` | revogação geral e concessões explícitas (lista de permissões) |
+| 1 | `supabase/migrations/20261023000100_base.sql` | schema `private`, enums, utilitários reaproveitados, bloqueio de `TRUNCATE` |
+| 2 | `supabase/migrations/20261023000200_audit.sql` | `audit_logs`, contexto de auditoria, trigger genérico, eventos semânticos |
+| 3 | `supabase/migrations/20261023000300_access.sql` | `partners` (mínima), `profiles`, trigger do Auth, funções de autorização, guardas, trava do último Administrador, política de leitura de `audit_logs`, procedimentos de acesso e bootstrap |
+| 4 | `supabase/migrations/20261023000400_proof_files.sql` | `proof_files`, RPCs de envio, bucket `proofs` e políticas de `storage.objects` |
+| 5 | `supabase/migrations/20261023000500_privileges.sql` | revogação geral, concessões explícitas (lista de permissões) e revogação de `TRUNCATE` |
+
+Depois da primeira aplicação remota, nenhuma destas migrations é editada: mudanças entram por migration nova (plano 7.5).
 
 ### 3.1 Base
 
@@ -384,7 +386,9 @@ create type public.proof_extraction_status as enum ('NOT_REQUESTED', 'PENDING', 
 -- NÃO reaproveitadas: to_percentage, normalize_cnpj/is_valid_cnpj (voltam na
 -- feature Clientes, já com a decisão de P-13), enums de 07/10.
 
--- Bloqueio de TRUNCATE (statement-level), usado na auditoria.
+-- Bloqueio de TRUNCATE (statement-level). Usado em audit_logs, partners, profiles
+-- e proof_files (D-E4-12): TRUNCATE não dispara os triggers de linha (auditoria,
+-- bloqueio de DELETE), por isso cada tabela que bloqueia DELETE também bloqueia TRUNCATE.
 create function private.prevent_truncate()
 returns trigger language plpgsql set search_path = '' as $$
 begin
@@ -392,7 +396,11 @@ begin
     using errcode = 'insufficient_privilege';
 end;
 $$;
-revoke execute on function private.prevent_truncate() from public;
+
+-- revoke execute ... from public nas cinco funções acima.
+-- normalize_alias é pura e IMMUTABLE e é avaliada em colunas geradas e índices na
+-- escrita da tabela: o EXECUTE é verificado para quem escreve (D-E4-06).
+grant execute on function private.normalize_alias(text) to authenticated, service_role;
 ```
 
 ### 3.2 Auditoria estendida (plano 9)
@@ -439,6 +447,7 @@ create trigger audit_logs_no_truncate
 
 -- Contexto da transação (motivo, origem, correlação, rótulo do executor).
 -- Chamado pelas RPCs e pelos procedimentos; vale até o fim da transação (is_local = true).
+-- Função disparada por TRIGGER nunca chama esta função ("Quem define o contexto", nas notas).
 create function private.set_audit_context(
   p_reason          text,
   p_source          public.audit_source default null,
@@ -447,7 +456,10 @@ create function private.set_audit_context(
 ) returns void
 language plpgsql set search_path = '' as $$
 begin
-  perform pg_catalog.set_config('app.audit_reason',      coalesce(pg_catalog.btrim(p_reason), ''), true);
+  -- RAT-D021: o motivo é opcional. Vazio ou só com espaços, tabs e quebras de linha vira
+  -- "sem motivo" ('' no GUC, NULL em audit_logs.reason). Informado, é gravado sem as bordas em branco.
+  perform pg_catalog.set_config('app.audit_reason',
+    coalesce(pg_catalog.btrim(p_reason, E' \t\r\n'), ''), true);
   perform pg_catalog.set_config('app.audit_source',      coalesce(p_source::text, ''), true);
   perform pg_catalog.set_config('app.correlation_id',    coalesce(p_correlation_id::text, ''), true);
   perform pg_catalog.set_config('app.audit_actor_label', coalesce(pg_catalog.btrim(p_actor_label), ''), true);
@@ -482,7 +494,7 @@ begin
     reason, source, correlation_id, actor_user_id, actor_role, actor_label, request_role)
   values (
     p_kind, p_entity, p_entity_id, p_action, p_previous, p_new,
-    nullif(current_setting('app.audit_reason', true), ''),
+    nullif(pg_catalog.btrim(current_setting('app.audit_reason', true), E' \t\r\n'), ''),  -- em branco = NULL
     coalesce(v_source_txt::public.audit_source,
              case when v_uid is not null then 'UI'
                   when v_jwt_role = 'service_role' then 'SYSTEM'
@@ -554,28 +566,17 @@ begin
 end;
 $$;
 
--- Ações que exigem motivo chamam esta função antes de escrever.
-create function private.require_audit_reason()
-returns text language plpgsql stable set search_path = '' as $$
-declare v_reason text := pg_catalog.btrim(coalesce(current_setting('app.audit_reason', true), ''));
-begin
-  if v_reason = '' then
-    raise exception 'Esta operação exige motivo.' using errcode = 'check_violation';
-  end if;
-  return v_reason;
-end;
-$$;
+-- Não existe private.require_audit_reason (retirada pela RAT-D021, D-E4-13): nenhuma
+-- operação é bloqueada por falta de motivo.
 
 revoke execute on function private.audit_insert(public.audit_kind, text, uuid, text, jsonb, jsonb) from public;
 revoke execute on function private.audit_row_change() from public;
 revoke execute on function private.audit_event(text, uuid, text, jsonb) from public;
 revoke execute on function private.set_audit_context(text, public.audit_source, uuid, text) from public;
-revoke execute on function private.require_audit_reason() from public;
--- RPCs SECURITY INVOKER (executadas como authenticated) chamam estas três.
+-- RPCs SECURITY INVOKER (executadas como authenticated) chamam estas duas.
 -- O schema private não é exposto pelo PostgREST: o cliente não as chama diretamente.
 grant execute on function private.audit_event(text, uuid, text, jsonb) to authenticated;
 grant execute on function private.set_audit_context(text, public.audit_source, uuid, text) to authenticated;
-grant execute on function private.require_audit_reason() to authenticated;
 
 create index audit_logs_entity_idx      on public.audit_logs (entity, entity_id, seq desc);
 create index audit_logs_actor_idx       on public.audit_logs (actor_user_id, seq desc) where actor_user_id is not null;
@@ -584,7 +585,7 @@ create index audit_logs_correlation_idx on public.audit_logs (correlation_id) wh
 create index audit_logs_tx_idx          on public.audit_logs (tx_id);
 
 -- Matriz do plano 6: só o Administrador lê a auditoria.
--- (private.is_admin é criada na 0300; a política vai para a 0300 ou para depois dela.)
+-- Implementada na 0300, depois de private.is_admin.
 create policy audit_logs_select_admin on public.audit_logs
   for select to authenticated
   using ((select private.is_admin()));
@@ -592,6 +593,7 @@ create policy audit_logs_select_admin on public.audit_logs
 
 Notas:
 
+- **Motivo opcional** ([OFICIAL] RAT-D021; D-E4-13). As ações auditadas aceitam motivo e o gravam em `audit_logs.reason` quando informado; nenhuma é bloqueada sem ele. Motivo vazio ou só com espaços, tabs, `CR` e `LF` vira `NULL` (normalização em `set_audit_context` e em `audit_insert`); motivo informado é gravado sem as bordas em branco. A auditoria continua registrando quem, o quê, quando e de onde (RAT-D009) também sem motivo. Features futuras **não** devem recriar uma função que exija motivo sem nova decisão do responsável. [OFICIAL] RAT-D021 + [PROPOSTA] (normalização)
 - `source` e `correlation_id` são **informativos** (o cliente pode influenciar o cabeçalho). Os campos confiáveis são `actor_user_id` (JWT validado), `actor_role` (lido do banco), `created_at`, `seq`, `tx_id` e `request_role`. [PROPOSTA]
 - O nome do campo de horário é `created_at`, como no plano 9; a diferença para 07/10 é só o padrão (`clock_timestamp()` em vez de `now()`), que dá um horário por evento e não um por transação. [PROPOSTA]
 - A ação semântica de liquidação chama-se `SETTLE` (o plano 9 cita `LIQUIDATE` numa lista exemplificativa). Motivo: mesmo radical do estado `SETTLED` e da tabela `competence_settlements`, para que código, enum e auditoria usem um termo só. Registrado em D-04. [PROPOSTA]
@@ -624,6 +626,8 @@ create trigger partners_audit after insert or update or delete on public.partner
   for each row execute function private.audit_row_change('partner');
 create trigger partners_no_delete before delete on public.partners
   for each row execute function private.prevent_mutation();        -- inativar, nunca excluir
+create trigger partners_no_truncate before truncate on public.partners
+  for each statement execute function private.prevent_truncate();  -- D-E4-12
 alter table public.partners enable row level security;
 
 create table public.profiles (
@@ -652,6 +656,8 @@ create trigger profiles_set_updated_at before update on public.profiles
   for each row execute function private.set_updated_at();
 create trigger profiles_audit after insert or update or delete on public.profiles
   for each row execute function private.audit_row_change('profile');
+create trigger profiles_no_truncate before truncate on public.profiles
+  for each statement execute function private.prevent_truncate();  -- D-E4-12
 alter table public.profiles enable row level security;
 
 -- Perfil criado automaticamente, SEM papel (corrige F-01).
@@ -728,7 +734,7 @@ begin
   if new.role is distinct from old.role
      or new.partner_id is distinct from old.partner_id
      or new.active is distinct from old.active then
-    perform private.require_audit_reason();     -- motivo obrigatório (exemplo do CA-09)
+    -- RAT-D021: o motivo é opcional. A guarda não o exige; quando informado, vai para a auditoria (CA-09).
     -- Serializa mudanças de acesso: evita que duas transações concorrentes
     -- removam, cada uma, "o outro" Administrador.
     perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('financeiro_ultra.access_change'));
@@ -742,12 +748,12 @@ create trigger profiles_guard_update before update on public.profiles
 -- Guarda de criação de perfil: fecha o caminho "apagar o perfil e reinseri-lo já com papel"
 -- (ou inserir com papel para um usuário sem perfil). O trigger do Auth e os procedimentos
 -- criam o perfil SEM papel e SEM sócio; só então o UPDATE (com a guarda acima) atribui acesso.
--- Inserir já com papel ou sócio exige o mesmo contexto com motivo e a mesma serialização.
+-- Inserir já com papel ou sócio exige a mesma serialização (RAT-D021: motivo opcional;
+-- quando informado, vai para a auditoria).
 create function private.profiles_guard_insert()
 returns trigger language plpgsql set search_path = '' as $$
 begin
   if new.role is not null or new.partner_id is not null then
-    perform private.require_audit_reason();
     perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('financeiro_ultra.access_change'));
   end if;
   return new;
@@ -758,8 +764,11 @@ create trigger profiles_guard_insert before insert on public.profiles
 -- Para as duas guardas: revoke execute ... from public.
 
 -- Depois de existir um Administrador ativo, o sistema nunca fica sem nenhum.
+-- SECURITY DEFINER (D-E4-01): o constraint trigger diferido roda no COMMIT sob o papel de quem
+-- apagou o usuário (ex.: supabase_auth_admin, na exclusão em cascata pelo Auth), que não tem
+-- SELECT em public.profiles. Só lê e lança erro. revoke execute ... from public.
 create function private.assert_admin_remains()
-returns trigger language plpgsql set search_path = '' as $$
+returns trigger language plpgsql security definer set search_path = '' as $$
 begin
   if old.role = 'ADMINISTRATOR' and old.active
      and not exists (select 1 from public.profiles p where p.role = 'ADMINISTRATOR' and p.active) then
@@ -779,7 +788,9 @@ create constraint trigger profiles_admin_remains
 --   private.bootstrap_first_admin(p_email text, p_executor_label text) returns text
 --   private.set_user_access(p_email text, p_role public.app_role, p_partner_id uuid,
 --                           p_active boolean, p_reason text, p_executor_label text) returns void
--- Para os dois: revoke all ... from public, anon, authenticated, service_role.
+--   private.resolve_user_for_access(p_email text) returns uuid   -- auxiliar dos dois (D-E4-03):
+--     localiza exatamente um usuário do Auth pelo e-mail e cria o perfil sem papel se faltar.
+-- Para os três: revoke all ... from public, anon, authenticated, service_role.
 -- Ambiente local: o seed atribui papéis chamando set_user_access pela CLI
 -- (supabase db query --local, conexão como postgres) — seção 7.2, passo 8.
 
@@ -804,7 +815,9 @@ Observações:
 - `profiles.id` em cascata com `auth.users` é mantido: um convite nunca aceito pode ser excluído pelo painel. Um usuário com histórico financeiro fica protegido pelas FKs `restrict` das tabelas de negócio (features), por `proof_files.uploaded_by` e pela trava do último Administrador. Política recomendada: **inativar, não excluir**. [PROPOSTA]
 - Escrita em `profiles` por `service_role` é revogada (seção 3.6): o runtime da FND não usa a chave secreta (plano 10) e nenhum fluxo legítimo precisa dela. O trigger do Auth e os procedimentos rodam como dono (`postgres`), e a exclusão em cascata a partir de `auth.users` roda com os privilégios do dono da tabela referenciadora; os dois caminhos continuam funcionando (confirmar no pgTAP de "Perfis"). [PROPOSTA]
 - Resíduo aceito: o papel `postgres` (dono) pode desligar triggers. Esse acesso é o do responsável pelo projeto, e a mitigação é organizacional (senha do banco só com ele; plano 10), não do schema. [PROPOSTA]
-- O trigger em `auth.users` segue o padrão documentado pelo Supabase para criação de perfis; confirmar na E4, contra a documentação vigente, que o projeto hospedado continua permitindo triggers em `auth.users` (ver R-D12).
+- O trigger em `auth.users` segue o padrão documentado pelo Supabase para criação de perfis. Funciona no banco local (E4, pgTAP verde); a confirmação no projeto hospedado ficou para a primeira aplicação remota, na E9 (R-D12, registro da E4 em `04-implementacao.md`).
+- **Motivo nas mudanças de acesso** ([OFICIAL] RAT-D021; D-E4-13): as guardas `profiles_guard_update` e `profiles_guard_insert` não exigem motivo; continuam serializando (trava consultiva) e a auditoria `ROW_CHANGE` é gravada sempre, com `reason` nulo quando não houver motivo.
+- **`TRUNCATE`** em `partners` e `profiles` é bloqueado por trigger `BEFORE TRUNCATE` e revogado de `anon`, `authenticated` e `service_role` (3.6; D-E4-12).
 
 ### 3.4 Tabelas auditadas na FND
 
@@ -814,7 +827,7 @@ Observações:
 | `profiles` | `audit_row_change('profile')` | — |
 | `proof_files` | `audit_row_change('proof_file', 'raw_extraction')` | `raw_extraction` (dados pessoais e bancários extraídos; P-20) |
 
-As tabelas das features entram com o mesmo trigger, cada uma na sua migration.
+As tabelas das features entram com o mesmo trigger, cada uma na sua migration. As quatro tabelas da FND (`audit_logs` e as três acima) também têm trigger `BEFORE TRUNCATE` com `private.prevent_truncate()` (D-E4-12). **Regra para as features** [PROPOSTA]: toda tabela auditada, ou que bloqueia `DELETE`, ganha o mesmo trigger `BEFORE TRUNCATE`, porque `TRUNCATE` não dispara triggers de linha (a revogação geral de 3.6 já cobre `anon`, `authenticated` e `service_role`, mas não o dono).
 
 **Regra para toda tabela auditada** [PROPOSTA]: ter PK `id uuid`. Tabelas de associação (`client_partners`, `calculation_partner_balances`) usam chave substituta `id uuid` + `unique` no par natural, em vez de PK composta. Motivo: o trigger genérico identifica a linha por `id`, e `audit_logs.entity_id` é `uuid not null`; com PK composta, toda escrita falharia. Alternativas descartadas: `entity_id` como `text`/`jsonb` (perde o tipo e o índice simples da consulta 8.4) e coluna de identidade por `TG_ARGV` (não resolve PK de duas colunas). O trigger falha com mensagem explícita se a regra for violada (3.2), e o teste de catálogo (12.2) verifica que toda tabela com `audit_row_change` tem coluna `id` do tipo `uuid`.
 
@@ -829,9 +842,12 @@ route handler (servidor, JWT do usuário)
       ├─ hash já existe → devolve o registro existente (is_duplicate = true); não envia de novo (CA-10)
       └─ hash novo      → cria linha PENDING_UPLOAD com storage_path definido pelo banco
  3. storage.upload('proofs', storage_path, arquivo, { upsert: false })
-      └─ a política de INSERT só aceita o caminho de uma linha PENDING_UPLOAD
+      └─ a política de INSERT só aceita o caminho de uma linha PENDING_UPLOAD, não excluída,
+         cujo uploaded_by é o próprio usuário (D-E4-10)
  4. rpc complete_proof_file_upload(id)
-      └─ confere o objeto (existe; tamanho e mimetype iguais) → STORED (idempotente)
+      └─ a guarda de UPDATE confere em storage.objects um objeto do bucket proofs com
+         name = storage_path, metadata.size = size_bytes e metadata.mimetype = mime_type;
+         sem ele, falha com 23514 (check_violation); com ele → STORED (idempotente)
 
 O banco garante a coerência ENTRE linha e objeto (caminho, tamanho, tipo declarado),
 mas NÃO confere o conteúdo: sha256 e tipo real só são garantidos quando o fluxo passa
@@ -876,7 +892,9 @@ create table public.proof_files (
   constraint proof_files_confidence_range   check (confidence_score is null or confidence_score between 0 and 1),
   constraint proof_files_deletion_consistency check (
        (deleted_at is null and deleted_by is null and deletion_reason is null)
-    or (deleted_at is not null and deleted_by is not null and char_length(btrim(deletion_reason)) > 0))
+    -- RAT-D021: o motivo da exclusão é opcional; o CHECK exige só a coerência entre
+    -- deleted_at e deleted_by. Motivo em branco vira NULL na guarda de UPDATE.
+    or (deleted_at is not null and deleted_by is not null))
 );
 comment on column public.proof_files.storage_path is
   'Definido pelo banco: {aaaa}/{mm}/{id}.{ext} (aaaa/mm do created_at em UTC). Nunca contém o nome original.';
@@ -898,6 +916,11 @@ begin
   new.uploaded_by       := auth.uid();
   if new.uploaded_by is null then
     raise exception 'Envio de comprovante exige usuário autenticado.' using errcode = 'insufficient_privilege';
+  end if;
+  -- D-E4-02: tipo inválido falha aqui com mensagem própria (sem isto o CASE abaixo geraria
+  -- caminho nulo e o erro apareceria como NOT NULL em storage_path). O CHECK continua valendo.
+  if new.mime_type is null or new.mime_type not in ('application/pdf', 'image/jpeg', 'image/png') then
+    raise exception 'Tipo de arquivo não permitido para comprovante.' using errcode = 'check_violation';
   end if;
   new.upload_status     := 'PENDING_UPLOAD';
   new.stored_at         := null;
@@ -953,6 +976,8 @@ begin
     end if;
     new.deleted_at := now();
     new.deleted_by := auth.uid();
+    -- RAT-D021: motivo opcional; em branco vira NULL, informado é gravado sem as bordas em branco.
+    new.deletion_reason := nullif(pg_catalog.btrim(new.deletion_reason, E' \t\r\n'), '');
   end if;
 
   -- Campos de extração: sem escrita pela aplicação na FND (a feature de leitura automática define quem grava).
@@ -971,19 +996,28 @@ create trigger proof_files_guard_update before update on public.proof_files
   for each row execute function private.proof_files_guard_update();
 create trigger proof_files_no_delete before delete on public.proof_files
   for each row execute function private.prevent_mutation();       -- exclusão só lógica
+create trigger proof_files_no_truncate before truncate on public.proof_files
+  for each statement execute function private.prevent_truncate();  -- D-E4-12
+-- revoke execute ... from public nas duas funções de trigger acima.
 
 -- Funções das políticas de storage (SECURITY DEFINER: leem proof_files sem depender do RLS).
 create function private.proof_upload_allowed(p_name text) returns boolean
 language sql stable security definer set search_path = '' as $$
   select exists (select 1 from public.proof_files f
-                  where f.storage_path = p_name and f.upload_status = 'PENDING_UPLOAD' and f.deleted_at is null);
+                  where f.storage_path = p_name and f.upload_status = 'PENDING_UPLOAD' and f.deleted_at is null
+                    and f.uploaded_by = (select auth.uid()));   -- só o dono do registro pendente envia (D-E4-10)
 $$;
 create function private.proof_readable(p_name text) returns boolean
 language sql stable security definer set search_path = '' as $$
   select exists (select 1 from public.proof_files f where f.storage_path = p_name and f.deleted_at is null);
 $$;
+-- revoke execute ... from public; grant execute ... to authenticated (D-E4-05): as políticas de
+-- storage.objects avaliam as duas como authenticated. Ficam em private (fora do PostgREST) e
+-- devolvem só booleano.
 
 -- RPCs (SECURITY INVOKER: RLS e guardas valem; nenhuma RPC pública SECURITY DEFINER na FND).
+-- Corpo completo em 20261023000400_proof_files.sql. register_proof_file usa
+-- "#variable_conflict use_column" (D-E4-04): as colunas de saída colidem com as de proof_files.
 --
 -- public.register_proof_file(p_sha256 text, p_mime_type text, p_size_bytes bigint, p_original_name text)
 --   returns table (proof_file_id uuid, storage_path text, upload_status public.proof_upload_status,
@@ -995,8 +1029,9 @@ $$;
 --
 -- public.complete_proof_file_upload(p_proof_file_id uuid) returns public.proof_files
 --   1. exige private.can_operate();
---   2. se já STORED, devolve a linha (idempotente);
---   3. senão UPDATE set upload_status = 'STORED' (a guarda confere o objeto no bucket).
+--   2. inexistente → no_data_found; se já STORED, devolve a linha (idempotente);
+--   3. senão UPDATE set upload_status = 'STORED' (a guarda confere o objeto em storage.objects:
+--      nome, tamanho e mimetype; divergência ou ausência → 23514).
 
 -- RLS de proof_files
 create policy proof_files_select on public.proof_files
@@ -1020,6 +1055,7 @@ on conflict (id) do update
 create policy proofs_insert on storage.objects
   for insert to authenticated
   with check (bucket_id = 'proofs' and (select private.can_operate()) and private.proof_upload_allowed(name));
+  -- proof_upload_allowed exige também uploaded_by = auth.uid() (D-E4-10)
 create policy proofs_select on storage.objects
   for select to authenticated
   using (bucket_id = 'proofs' and (select private.can_read_business()) and private.proof_readable(name));
@@ -1028,14 +1064,15 @@ create policy proofs_select on storage.objects
 
 Notas:
 
-- A URL assinada é gerada no servidor com o cliente do usuário (`createSignedUrl` exige `SELECT` no objeto), com validade curta. [PROPOSTA] (plano 8)
-- A unicidade de `sha256` vale também para registros excluídos logicamente: reenviar um arquivo excluído devolve o registro existente (`deleted = true`) e a interface decide. Restaurar comprovante excluído não está previsto na FND. [PROPOSTA]
-- Linhas `PENDING_UPLOAD` sem objeto (envio interrompido) são inofensivas: o mesmo hash retoma o envio a partir da etapa 2. A limpeza de pendentes antigos fica para a feature de upload. [PROPOSTA]
+- A URL assinada é gerada no servidor com o cliente do usuário (`createSignedUrl` exige `SELECT` no objeto), com validade curta. Implementado na E7 como `GET /api/comprovantes/{id}/url`, que devolve JSON com a URL e `expiresInSeconds = 60`; lê Administrador, Operador e Visualizador; comprovante pendente ou excluído logicamente responde 404 (D-E7-03). [PROPOSTA] (plano 8)
+- A unicidade de `sha256` vale também para registros excluídos logicamente: reenviar um arquivo excluído devolve o registro existente (`deleted = true`) e a interface decide (a rota da E7 responde 409). Restaurar comprovante excluído não está previsto na FND. [PROPOSTA]
+- Linhas `PENDING_UPLOAD` sem objeto (envio interrompido) são inofensivas para os dados, mas **só o mesmo usuário retoma o envio**: desde D-E4-10, a política de `storage.objects` aceita o objeto apenas de quem criou o registro pendente. Se outro usuário enviar o mesmo arquivo, `register_proof_file` devolve o pendente alheio e o envio ao bucket é negado (a rota da E7 responde 409). O hash fica "preso" até o dono retomar ou até haver limpeza de pendentes antigos (consulta 8.3), que continua para a feature de upload (R-D23). [PROPOSTA]
+- **Motivo da exclusão lógica opcional** ([OFICIAL] RAT-D021; D-E4-13, que substitui D-E4-11): o CHECK `proof_files_deletion_consistency` exige só `deleted_at` e `deleted_by` coerentes; a guarda grava o motivo quando informado e transforma motivo em branco em `NULL`. A exclusão continua só lógica, definitiva e exclusiva do Administrador.
 - **Limite de tamanho: 4 MiB provisório** (era 10 MiB na revisão 1). O limite está no bucket **e** na constraint; mudar P-15 exige migration nos dois lugares. [PENDENTE] P-15. Motivos da redução [PROPOSTA]:
   - **Vercel (RAT-D016):** o corpo de requisição de uma Function tem limite público de cerca de **4,5 MB** (limite da plataforma, **a confirmar** na documentação atual da Vercel na E7; não verificável nesta modelagem). Arquivo de 4 MiB + cabeçalhos do multipart cabe com folga; 10 MiB não chegaria ao handler.
-  - **Proxy do Next 16:** com proxy ativo, o corpo é guardado em memória até `proxyClientMaxBodySize` (padrão 10 MB); acima disso o handler recebe **só o corpo parcial, sem erro** (`node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/proxyClientMaxBodySize.md`). O matcher atual de `src/proxy.ts` cobre `/api`. Com 4 MiB o limite não é atingido, mas a rota de upload deve sair do matcher (ela valida a sessão por conta própria com `getClaims()`) para que um corpo truncado nunca chegue silenciosamente ao handler. Alternativa: ajustar `proxyClientMaxBodySize` (opção experimental). Em qualquer caso, o handler compara o tamanho recebido com o `Content-Length` e rejeita divergência.
+  - **Proxy do Next 16:** com proxy ativo, o corpo é guardado em memória até `proxyClientMaxBodySize` (padrão 10 MB); acima disso o handler recebe **só o corpo parcial, sem erro** (`node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/proxyClientMaxBodySize.md`). **Como foi implementado (E7):** a rota de upload **continua** no matcher do proxy, que passou a responder `401` em JSON a qualquer `/api/*` sem sessão (D-E7-01); a proteção contra corpo truncado ficou no handler, que lê o corpo com limite próprio de 4 MiB + 64 KiB de folga de multipart (confere `Content-Length` e conta os bytes lidos) e depois confere o tamanho exato do arquivo. Como o limite do handler é muito menor que os 10 MB do proxy, um corpo truncado pelo proxy já excede o limite e é recusado. A sugestão da revisão 2 (tirar a rota do matcher) não foi necessária.
   - Se P-15 pedir arquivos maiores que o limite da Vercel, o caminho muda (envio direto ao Storage por URL de upload assinada), e isso reabre R-D18, porque o hash deixaria de ser calculado no servidor. Decisão junto com P-15.
-- **O que o banco garante e o que não garante** [PROPOSTA]: a deduplicação (I-12) é sobre o `sha256` **declarado** na RPC, e `STORED` (I-14) confere tamanho e `mimetype` **declarados** ao Storage (o `mimetype` do objeto vem do cabeçalho do envio). O banco não recalcula hash nem lê assinatura binária. Como Operador e Administrador têm `EXECUTE` em `register_proof_file` e `INSERT` em `storage.objects` com o próprio JWT, quem chamar a API diretamente, sem o route handler do plano 8, pode registrar um hash que não corresponde ao arquivo ou enviar um arquivo cujo conteúdo não bate com o tipo. Risco registrado em R-D18 e encaminhado à revisão `seguranca` (E8b).
+- **O que o banco garante e o que não garante** [PROPOSTA]: a deduplicação (I-12) é sobre o `sha256` **declarado** na RPC, e `STORED` (I-14) confere tamanho e `mimetype` **declarados** ao Storage (o `mimetype` do objeto vem do cabeçalho do envio). O banco não recalcula hash nem lê assinatura binária. Como Operador e Administrador têm `EXECUTE` em `register_proof_file` e `INSERT` em `storage.objects` com o próprio JWT, quem chamar a API diretamente, sem o route handler do plano 8, pode registrar um hash que não corresponde ao arquivo ou enviar um arquivo cujo conteúdo não bate com o tipo. No caminho da aplicação (E7), o hash é calculado pelo servidor e o tipo é conferido pela assinatura binária; o tipo declarado é obrigatório e precisa ser exatamente um dos três permitidos (D-E7-02). O caminho direto (R-D18) foi **aceito** pela revisão de segurança (SEG-E8B-02) com base na RAT-D020, sem camada extra, para rever quando houver tela de upload ou dados reais.
 
 ### 3.6 Privilégios (lista de permissões)
 
@@ -1060,9 +1097,17 @@ grant execute on function public.complete_proof_file_upload(uuid)               
 -- escrita em profiles e audit_logs: sem isto, a chave secreta inseriria perfis com papel sem
 -- motivo (I-07) e forjaria linhas de auditoria (I-09). Triggers e procedimentos rodam como postgres.
 revoke insert, update, delete, truncate on public.profiles, public.audit_logs from service_role;
+
+-- TRUNCATE não dispara os triggers de linha (auditoria, bloqueio de DELETE): ninguém além do dono
+-- das tabelas o recebe, em nenhuma tabela de public, nem nas criadas no futuro (D-E4-12).
+-- partners, profiles, proof_files e audit_logs ainda têm trigger BEFORE TRUNCATE que bloqueia.
+revoke truncate on all tables in schema public from anon, authenticated, service_role;
+alter default privileges for role postgres in schema public revoke truncate on tables from anon, authenticated, service_role;
 ```
 
-Cada feature acrescenta as próprias concessões na sua migration (nunca `grant all`). O teste de catálogo do CA-05 verifica que `anon` não tem nenhum privilégio em `public`.
+Com a RAT-D021, o comentário "sem motivo" acima perdeu o sentido literal (o motivo deixou de ser exigido); o motivo da revogação continua válido: a chave secreta não pode atribuir papéis nem forjar auditoria. O comentário é o da migration implementada.
+
+Cada feature acrescenta as próprias concessões na sua migration (nunca `grant all`, nunca `TRUNCATE`). O teste de catálogo do CA-05 verifica que `anon` não tem nenhum privilégio em `public`.
 
 ---
 
@@ -1078,18 +1123,19 @@ Cada feature acrescenta as próprias concessões na sua migration (nunca `grant 
 | I-04 | `PARTNER` ⇒ `partner_id` não nulo | CHECK `profiles_partner_role_requires_partner` | [PROPOSTA] |
 | I-05 | Cada sócio tem no máximo um login | índice único parcial `profiles_partner_id_key` | [PROPOSTA] |
 | I-06 | O papel `PARTNER` não lê dados de negócio nem arquivos até P-02b | `can_read_business()` exclui `PARTNER`; nenhuma política usa `current_partner_id()` na FND | [OFICIAL] RAT-D011 (só o login próprio do sócio) + [PROPOSTA] (papel Sócio negado por padrão: plano 6 e 17, aprovado) + [PENDENTE] P-02b |
-| I-07 | Atribuir ou mudar papel, vínculo ou ativação exige motivo e fica auditado, por UPDATE ou por INSERT | `profiles_guard_update` + `profiles_guard_insert` + `audit_row_change` + escrita revogada de `service_role` (3.6). Resíduo: `postgres` pode desligar triggers (3.3) | [OFICIAL] RAT-D009 + [PROPOSTA] |
+| I-07 | Atribuir ou mudar papel, vínculo ou ativação fica auditado e serializado, por UPDATE ou por INSERT; o motivo é gravado quando informado e não é exigido | `profiles_guard_update` + `profiles_guard_insert` (trava consultiva) + `audit_row_change` + escrita revogada de `authenticated` e `service_role` (3.6). Resíduo: `postgres` pode desligar triggers (3.3) | [OFICIAL] RAT-D009 + [OFICIAL] RAT-D021 (motivo opcional) + [PROPOSTA] |
 | I-08 | Depois do primeiro Administrador, sempre existe ao menos um ativo | constraint trigger `profiles_admin_remains` + trava consultiva | [PROPOSTA] |
-| I-09 | A auditoria é append-only: sem `UPDATE`, `DELETE` ou `TRUNCATE`; nenhuma linha inserida fora das funções de auditoria | triggers + ausência de concessões (inclusive `INSERT` revogado de `service_role`) | [OFICIAL] RAT-D009 + [PROPOSTA] |
+| I-09 | A auditoria é append-only: sem `UPDATE`, `DELETE` ou `TRUNCATE`; nenhuma linha inserida fora das funções de auditoria | triggers (`audit_logs_immutable`, `audit_logs_no_truncate`) + ausência de concessões (inclusive `INSERT` e `TRUNCATE` revogados de `service_role`) | [OFICIAL] RAT-D009 + [PROPOSTA] |
 | I-10 | Todo evento de auditoria tem horário do servidor, ordem total e origem | `created_at default clock_timestamp()`, `seq`, `source not null` | [PROPOSTA] (Brain 10, rascunho: timestamps de servidor) |
 | I-10b | Trigger não sobrescreve o contexto de auditoria da transação: criar um usuário em `auth.users` não muda motivo, origem, correlação nem rótulo das escritas seguintes; sem contexto, o `CREATE` do perfil sai como `SYSTEM`/`supabase-auth` | `private.handle_new_user` (lê, define só os vazios, restaura) + regra de 3.2 ("Quem define o contexto") + pgTAP (12.2) | [PROPOSTA] |
 | I-11 | Sócio não é excluído fisicamente | `partners_no_delete` | [PROPOSTA] (plano 7.1) |
 | I-12 | Um SHA-256 **declarado** é registrado uma única vez. Que o hash corresponda ao conteúdo só é garantido no caminho do route handler (R-D18) | `proof_files_sha256_key` | [OFICIAL] RN-008 + [PROPOSTA] |
 | I-13 | O caminho no bucket é definido pelo banco, contém o `id` e nunca o nome original | trigger `before insert` + CHECKs de caminho | [PROPOSTA] (plano 8) |
 | I-14 | `STORED` ⇒ o objeto existe no bucket com o tamanho registrado e o `mimetype` declarado no envio. O tipo **real** (assinatura binária) só é garantido no caminho do route handler (R-D18) | `proof_files_guard_update` + `stored_consistency` | [PROPOSTA] |
-| I-15 | Metadados do comprovante são imutáveis; exclusão só lógica, definitiva, pelo Administrador e com motivo | guarda + `proof_files_no_delete` + CHECK de exclusão | [PROPOSTA] |
-| I-16 | Bucket privado, sem sobrescrita e sem exclusão pela API | `public = false`; sem políticas de UPDATE/DELETE em `storage.objects` | [PROPOSTA] (plano 8) |
+| I-15 | Metadados do comprovante são imutáveis; exclusão só lógica, definitiva e pelo Administrador; motivo gravado quando informado (em branco vira `NULL`), não exigido | guarda + `proof_files_no_delete` + CHECK `proof_files_deletion_consistency` (só coerência entre `deleted_at` e `deleted_by`) | [OFICIAL] RAT-D021 (motivo opcional) + [PROPOSTA] |
+| I-16 | Bucket privado, sem sobrescrita e sem exclusão pela API; o objeto de um comprovante só é enviado pelo usuário que criou o registro pendente | `public = false`; sem políticas de UPDATE/DELETE em `storage.objects`; `proof_upload_allowed` exige `uploaded_by = auth.uid()` (D-E4-10) | [PROPOSTA] (plano 8) |
 | I-17 | Dinheiro e percentual nunca em float | convenção + teste de catálogo (CA-11): nenhuma coluna `real`/`double precision` em `public` | [OFICIAL] Brain 07 |
+| I-18 | `TRUNCATE` não contorna auditoria nem bloqueio de exclusão: nenhum papel além do dono o recebe em `public` (também nas tabelas futuras), e as tabelas da FND o bloqueiam por trigger | `revoke truncate` + default privileges (3.6); `BEFORE TRUNCATE` em `audit_logs`, `partners`, `profiles` e `proof_files` (D-E4-12) | [PROPOSTA] |
 
 ### 4.2 Para as features (conceituais; cada feature implementa e testa)
 
@@ -1110,7 +1156,7 @@ Cada feature acrescenta as próprias concessões na sua migration (nunca `grant 
 | I-32 | Compensações da apuração quitam exatamente os saldos líquidos: para cada sócio, Σ saídas − Σ entradas da versão = `net_balance` | constraint trigger diferida | [OFICIAL] RN-012 + [PROPOSTA] (saldo líquido) |
 | I-32b | Compensação `PAID` nunca muda de status nem é anulada por reapuração | guarda de transição | [PROPOSTA] |
 | I-33 | Liquidar exige todas as compensações `PAID` ou `JUSTIFIED` e a apuração `CURRENT` com `inputs_fingerprint` igual ao estado atual | RPC de liquidação | [OFICIAL] RN-013, Brain 09 |
-| I-34 | Reabertura só pelo Administrador, com motivo; nunca apaga a liquidação anterior | RPC + `competence_reopenings` + `require_audit_reason` | [OFICIAL] Brain 09, RN-014 |
+| I-34 | Reabertura só pelo Administrador; nunca apaga a liquidação anterior; motivo gravado quando informado, não exigido | RPC + `competence_reopenings` + `set_audit_context` com o motivo informado | [OFICIAL] Brain 09, RN-014 + [OFICIAL] RAT-D021 (motivo opcional na reabertura) |
 | I-35 | Apelido/identificador ativo resolve para uma única entidade | índices únicos parciais por (`tipo`, `normalized_value`) | [PROPOSTA] |
 | I-36 | CNPJ normalizado do cliente é único e válido | coluna gerada + CHECK de DV | [PROPOSTA] + [PENDENTE] P-13 |
 | I-37 | Nenhuma tabela guarda percentual como parâmetro (sócio ou cliente) | revisão de schema + teste de catálogo: as únicas colunas de percentual de `public` são as do snapshot | [OFICIAL] RAT-D015, RAT-D004 revogada |
@@ -1138,7 +1184,7 @@ Cada feature acrescenta as próprias concessões na sua migration (nunca `grant 
 | `proof_files_uploaded_by_idx (uploaded_by, created_at desc)` | `proof_files` | FK + "meus envios" |
 | `proof_files_pending_idx (created_at) where PENDING_UPLOAD` | `proof_files` | limpeza/retomada de envios interrompidos |
 
-O RLS da FND usa `profiles.id` (PK) em todas as funções; não precisa de índice adicional. FKs `deleted_by` → `profiles` não precisam de índice (sem exclusão de perfil com histórico, sem consulta por esse campo).
+O RLS da FND usa `profiles.id` (PK) em todas as funções; não precisa de índice adicional. FKs `deleted_by` → `profiles` não precisam de índice (sem exclusão de perfil com histórico, sem consulta por esse campo). Por isso o `supabase db advisors` aponta `unindexed_foreign_keys` em `proof_files` em nível `info`, abaixo do gate de CI (`--level warn`; D-E8-10). Se uma feature passar a consultar por `deleted_by`, ela acrescenta o índice.
 
 ### 5.2 Features (orientação)
 
@@ -1165,18 +1211,18 @@ O RLS da FND usa `profiles.id` (PK) em todas as funções; não precisa de índi
 ### 6.1 Forma
 
 - **Função no banco**, criada pela migration `0300`: `private.bootstrap_first_admin(p_email text, p_executor_label text) returns text`. Fica no schema `private` (fora do PostgREST) e com `EXECUTE` revogado de `public`, `anon`, `authenticated` e `service_role`: só o dono (`postgres`) executa, ou seja, só quem acessa o editor SQL do painel ou o banco com a senha do projeto.
-- **Script versionado** `scripts/sql/bootstrap-first-admin.sql`, que só chama a função dentro de uma transação. O arquivo versionado contém **placeholders**, nunca e-mail real ([OFICIAL] RAT-D019):
+- **Script versionado** `scripts/sql/bootstrap-first-admin.sql`, que só chama a função, como **uma única instrução** (D-E8-09): a função já é atômica (roda numa transação só), a CLI (`supabase db query`) aceita uma instrução por arquivo e o editor SQL do painel dispensa transação explícita. O arquivo versionado contém **placeholders**, nunca e-mail real ([OFICIAL] RAT-D019):
 
 ```sql
-begin;
 select private.bootstrap_first_admin(
-  '<EMAIL-DO-ADMINISTRADOR>',          -- e-mail do usuário já convidado/criado no painel
-  '<IDENTIFICACAO-DE-QUEM-EXECUTA>'    -- ex.: "responsavel-produto via painel"
+  '<EMAIL-DO-ADMINISTRADOR>',
+  '<IDENTIFICACAO-DE-QUEM-EXECUTA>'
 );
-commit;
 ```
 
+- A conferência posterior fica em `scripts/sql/bootstrap-first-admin-verify.sql` (evidência da E9b, sem o e-mail).
 - Ser função (e não um bloco `DO` solto) permite cobrir o contrato com pgTAP na E4/E8.
+- **Motivo:** a função não recebe motivo; o motivo gravado na auditoria é fixo ("Bootstrap do primeiro Administrador"). Com a RAT-D021 ele é informado, não exigido.
 
 ### 6.2 Comportamento
 
@@ -1186,7 +1232,7 @@ commit;
 | 2. Serialização | `pg_advisory_xact_lock(hashtext('financeiro_ultra.access_change'))` — a mesma trava das mudanças de acesso |
 | 3. Contexto | `private.set_audit_context('Bootstrap do primeiro Administrador', 'SCRIPT', null, p_executor_label)` — **antes de qualquer escrita**, para que todo `ROW_CHANGE` da transação (inclusive o `CREATE` do passo 5) saia com `source = SCRIPT`, motivo e `actor_label`. Só define variáveis da transação; não grava nada |
 | 4. Usuário | Exatamente **um** registro em `auth.users` com `lower(email) = lower(btrim(p_email))` e `deleted_at is null`. Zero → erro "crie/convide o usuário no painel primeiro". O e-mail não precisa estar confirmado (o convite pode ainda não ter sido aceito) |
-| 5. Perfil | `insert into public.profiles (id) values (...) on conflict (id) do nothing` (sem papel e sem sócio, o que a guarda de INSERT aceita) — cobre o usuário criado **antes** da migration (quando o trigger do Auth ainda não existia) |
+| 5. Perfil | `insert into public.profiles (id) values (...) on conflict (id) do nothing` (sem papel e sem sócio) — cobre o usuário criado **antes** da migration (quando o trigger do Auth ainda não existia). Os passos 4 e 5 estão na auxiliar `private.resolve_user_for_access(text)`, compartilhada com `set_user_access` (D-E4-03) |
 | 6. Idempotência | Se o perfil já é `ADMINISTRATOR` e `active`: retorna `'ALREADY_ADMIN'`, **sem escrever nada** (nem auditoria; o passo 5 não escreve, porque o perfil já existe) |
 | 7. Só o primeiro | Se existe **outro** Administrador ativo: erro "já existe Administrador; use `private.set_user_access`". O bootstrap nunca serve para criar o segundo Administrador |
 | 8. Promoção | `update public.profiles set role = 'ADMINISTRATOR', active = true where id = ...` (gera `ROW_CHANGE` com motivo, `source = SCRIPT`, `actor_label`, `request_role = 'direct:postgres'`) |
@@ -1199,9 +1245,9 @@ Pós-condições verificáveis (CA-15): exatamente um `ADMINISTRATOR` ativo; um 
 
 `private.set_user_access(p_email, p_role, p_partner_id, p_active, p_reason, p_executor_label)`, mesmas permissões do bootstrap:
 
-- exige `p_reason` e `p_executor_label` não vazios e define o contexto com `source = SCRIPT` **antes de qualquer escrita** (mesma regra do passo 3 do bootstrap);
-- localiza o usuário como no passo 4; cria o perfil (sem papel) se faltar;
-- aplica `role`, `partner_id` e `active` num único `UPDATE` (a guarda exige motivo e serializa; as CHECKs exigem sócio para `PARTNER`; a trava impede ficar sem Administrador);
+- exige `p_executor_label` não vazio (≤ 200) e `p_active` não nulo; `p_reason` é **opcional** ([OFICIAL] RAT-D021): em branco (espaços, tabs, `CR`, `LF`) vira motivo nulo na auditoria, informado é gravado; define o contexto com `source = SCRIPT` **antes de qualquer escrita** (mesma regra do passo 3 do bootstrap);
+- localiza o usuário como no passo 4; cria o perfil (sem papel) se faltar (`resolve_user_for_access`);
+- aplica `role`, `partner_id` e `active` num único `UPDATE` (a guarda serializa; as CHECKs exigem sócio para `PARTNER`; a trava impede ficar sem Administrador);
 - grava `EVENT` `ACCESS_CHANGE` com papel e sócio anteriores e novos;
 - se nada mudou, não escreve (idempotente).
 
@@ -1212,6 +1258,8 @@ Quando a feature de gestão de usuários existir (P-24), uma RPC pública restri
 ## 7. Plano de migration (linha de base — RAT-D012)
 
 [OFICIAL] RAT-D012 (refazer a base uma única vez, antes do primeiro ambiente publicado; preservar o código antigo; nada removido sem aprovação) + plano 7.5. Forma: [PROPOSTA].
+
+**Situação (revisão 4):** executado na E4 (arquivamento em `docs/legado/07-10/` e migrations `20261023000100` a `20261023000500`). As migrations ainda **não foram aplicadas em nenhum ambiente remoto**; por isso as mudanças da RAT-D021 entraram editando as próprias migrations, sem dado a migrar (D-E4-13). A partir da primeira aplicação remota (E9), vale só forward-only. As seções 7.1 a 7.6 ficam como registro do plano executado.
 
 ### 7.1 Pré-condições
 
@@ -1230,7 +1278,7 @@ Quando a feature de gestão de usuários existir (P-24), uma RPC pública restri
 | 5 | Copiar `src/types/database.types.ts` para `docs/legado/07-10/src/types/` e regenerar o arquivo ativo a partir do novo schema (`npm run db:types`) | O código antigo que ainda importa os tipos sai do caminho ativo na E5/E6 (plano 14) |
 | 6 | `scripts/seed-dev.ts` (chama RPCs antigas): mover para `docs/legado/07-10/scripts/` e escrever um novo, só com nomes fictícios (RAT-D019) | Coordenar com a E5 |
 | 7 | Criar as 5 migrations da seção 3 (`AAAAMMDD000100` … `000500`) | Timestamps posteriores a `20261007…`, para não colidir com nenhum histórico local |
-| 8 | Novo `supabase/seed.sql`: só dados fictícios — ex.: sócios "Sócio Exemplo A/B/C", nenhum percentual, **nenhum usuário**. Usuários e papéis pelo novo `seed-dev`, em duas fases: (a) cria usuários fictícios pela API admin do Auth local (padrão atual: `supabase-js` com a chave secreta local, recusando URL não local); o trigger cria os perfis sem papel; (b) atribui papéis executando um SQL versionado (ex.: `scripts/sql/seed-dev-access.sql`, só e-mails fictícios do domínio reservado `example.com`) com `supabase db query --local -f <arquivo>` — subcomando existente na CLI 2.120 instalada, que conecta como `postgres` e por isso pode chamar `private.set_user_access`. Sem dependência nova (plano 13.2) e sem expor o schema `private`. O script **fixa** `--local` e nunca aceita `--linked`/`--db-url`. Confirmar na E4 que a conexão do `db query --local` usa o papel `postgres` | [OFICIAL] RAT-D019 + [PROPOSTA] (forma) |
+| 8 | Novo `supabase/seed.sql`: só dados fictícios — ex.: sócios "Sócio Exemplo A/B/C", nenhum percentual, **nenhum usuário**. Usuários e papéis pelo novo `seed-dev`, em duas fases: (a) cria usuários fictícios pela API admin do Auth local (padrão atual: `supabase-js` com a chave secreta local, recusando URL não local); o trigger cria os perfis sem papel; (b) atribui papéis executando um SQL versionado (ex.: `scripts/sql/seed-dev-access.sql`, só e-mails fictícios do domínio reservado `example.com`) com `supabase db query --local -f <arquivo>` — subcomando existente na CLI 2.120 instalada, que conecta como `postgres` e por isso pode chamar `private.set_user_access`. Sem dependência nova (plano 13.2) e sem expor o schema `private`. O script **fixa** `--local` e nunca aceita `--linked`/`--db-url`. Confirmar na E4 que a conexão do `db query --local` usa o papel `postgres`. **Como foi implementado:** `seed-dev-access.sql` é uma única instrução `select` com as quatro chamadas, Administrador primeiro (a CLI 2.120 não aceita várias instruções; D-E4-07); a senha dos usuários fictícios vem de `DEV_SEED_PASSWORD` ou é aleatória, sem valor padrão no código (D-E4-08); o seed tem os sócios `Sócio Exemplo A/B/C` com UUIDs fixos e o usuário `PARTNER` vinculado ao A (D-E4-09) | [OFICIAL] RAT-D019 + [PROPOSTA] (forma) |
 | 9 | Novos pgTAP por tema (seção 12) | |
 | 10 | `supabase db reset` + `supabase test db` + `supabase db lint` + `supabase db advisors` | CA-04 |
 
@@ -1287,6 +1335,8 @@ select id, storage_path, uploaded_by, created_at
   from public.proof_files
  where upload_status = 'PENDING_UPLOAD' and created_at < now() - interval '1 day';
 ```
+
+Desde D-E4-10, um pendente só é retomado por quem o criou (`uploaded_by`); os pendentes desta consulta também são os hashes que outros usuários não conseguem enviar (R-D23). O critério e a forma da limpeza ficam para a feature de upload (exclusão física é bloqueada por `proof_files_no_delete`; a limpeza exigirá um caminho próprio e auditado). [PROPOSTA]
 
 ### 8.4 Trilha de uma entidade e de uma operação (FND)
 
@@ -1483,23 +1533,25 @@ select a.partner_id, sum(a.rounding_adjustment) as residual_received
 | R-D15 | Fuso | Recebimento de 31/10 23h30 (São Paulo) gravado como 01/11 UTC cai na competência errada | Média (features) | `received_on` é `date` informada (não derivada de `timestamptz`); fuso oficial em P-19 |
 | R-D16 | Formato | CNPJ alfanumérico (desde jul/2026) rejeitado por normalização só numérica | Média (feature Clientes) | P-13; normalização para maiúsculas alfanuméricas |
 | R-D17 | Regra | `split_count` grande (cliente com muitos sócios) e valor pequeno geram parcelas zero | Baixa | Permitido (`allocated_amount >= 0`); teste de borda (9.3) |
-| R-D18 | Integridade do comprovante | Operador ou Administrador que chame a API direto com o próprio JWT (sem o route handler) registra um `sha256` que não corresponde ao arquivo, ou envia conteúdo que não bate com o tipo declarado. Efeitos: duplicata não detectada (RN-008), arquivo de outro tipo servido como PDF/imagem, ou um hash "reservado" que faria um envio legítimo posterior parecer duplicado | Média | **Na FND:** documentado com precisão em I-12/I-14 e 3.5; os papéis com escrita são internos e autenticados, e toda escrita fica auditada com ator e `request_role`. **Encaminhado à `seguranca` (E8b)** para decidir entre: (a) aceite formal do risco, pelo caráter interno do papel; (b) verificação posterior no servidor (feature de upload): baixar o objeto `STORED`, recalcular SHA-256 e assinatura binária e marcar divergência (exigiria colunas novas, ex.: `content_verified_at`, por migration aditiva); (c) upload só pelo servidor com credencial própria, o que contraria a decisão do plano 10 de não usar a chave secreta no runtime. Proposta desta modelagem: (a) na FND + (b) na feature de upload. [PROPOSTA] |
-| R-D19 | Plataforma / truncamento | Arquivo no limite chega truncado ao route handler (proxy do Next guarda até 10 MB e depois entrega corpo parcial **sem erro**) ou é recusado pela Vercel (corpo de Function limitado a cerca de 4,5 MB — a confirmar) | Média (E7) | Limite provisório reduzido para 4 MiB (3.5); rota de upload fora do matcher do proxy; handler compara bytes recebidos com `Content-Length`; teste de upload no tamanho máximo e acima dele (12.4) |
-| R-D20 | Escalada de acesso | Apagar um perfil e reinseri-lo já com papel (ou inserir com papel para um usuário sem perfil) contornaria a guarda de UPDATE | Baixa | Guarda `profiles_guard_insert` (motivo + serialização) e escrita em `profiles` revogada de `service_role` (3.3, 3.6); resíduo: `postgres` pode desligar triggers (acesso do responsável) |
+| R-D18 | Integridade do comprovante | Operador ou Administrador que chame a API direto com o próprio JWT (sem o route handler) registra um `sha256` que não corresponde ao arquivo, ou envia conteúdo que não bate com o tipo declarado. Efeitos: duplicata não detectada (RN-008), arquivo de outro tipo servido como PDF/imagem, ou um hash "reservado" que faria um envio legítimo posterior parecer duplicado | Média | **Na FND:** documentado com precisão em I-12/I-14 e 3.5; os papéis com escrita são internos e autenticados, e toda escrita fica auditada com ator e `request_role`. **Encaminhado à `seguranca` (E8b)** para decidir entre: (a) aceite formal do risco, pelo caráter interno do papel; (b) verificação posterior no servidor (feature de upload): baixar o objeto `STORED`, recalcular SHA-256 e assinatura binária e marcar divergência (exigiria colunas novas, ex.: `content_verified_at`, por migration aditiva); (c) upload só pelo servidor com credencial própria, o que contraria a decisão do plano 10 de não usar a chave secreta no runtime. Proposta desta modelagem: (a) na FND + (b) na feature de upload. [PROPOSTA]. **Situação (revisão 4):** no caminho da aplicação, o hash é calculado no servidor (E7; SEG-E45-03 corrigido); o caminho direto foi **aceito** pela `seguranca` (SEG-E8B-02) com base na RAT-D020, sem camada extra, para rever quando houver tela de upload ou dados reais. A opção (b) continua só proposta |
+| R-D19 | Plataforma / truncamento | Arquivo no limite chega truncado ao route handler (proxy do Next guarda até 10 MB e depois entrega corpo parcial **sem erro**) ou é recusado pela Vercel (corpo de Function limitado a cerca de 4,5 MB — a confirmar) | Média (E7) | Limite provisório reduzido para 4 MiB (3.5). **Implementado (E7):** a rota continua no matcher do proxy (D-E7-01); o handler lê o corpo com limite de 4 MiB + 64 KiB (`Content-Length` e contagem de bytes) e confere o tamanho exato do arquivo; e2e no limite e acima dele (vazio, 4 MiB exato, 4 MiB + 1, 6 MiB, 12 MiB). O limite de corpo da Vercel continua a confirmar no primeiro deploy |
+| R-D20 | Escalada de acesso | Apagar um perfil e reinseri-lo já com papel (ou inserir com papel para um usuário sem perfil) contornaria a guarda de UPDATE | Baixa | Guarda `profiles_guard_insert` (serialização e auditoria; motivo opcional pela RAT-D021) e escrita em `profiles` revogada de `authenticated` e `service_role` (3.3, 3.6): a API não insere perfil; resíduo: `postgres` pode desligar triggers (acesso do responsável) |
 | R-D21 | Auditoria inutilizável | O trigger genérico identifica a linha por `id`; tabela auditada com PK composta faria toda escrita falhar | Média (features) | Regra "toda tabela auditada tem `id uuid`" (3.4); `client_partners` e `calculation_partner_balances` com chave substituta; erro explícito no trigger; teste de catálogo (12.2) |
 | R-D22 | Auditoria com origem/motivo errados | Função disparada por trigger que chama `set_audit_context` sobrescreve o contexto da transação inteira (ex.: criar usuário dentro de um script apagaria o motivo e atribuiria as escritas seguintes a `supabase-auth`) | Baixa | `handle_new_user` preserva e restaura o contexto (3.3); regra "Quem define o contexto" (3.2); I-10b; pgTAP (12.2) |
+| R-D23 | Bloqueio por pendente alheio | Desde D-E4-10, só quem criou o registro `PENDING_UPLOAD` envia o objeto. Se ele abandonar o envio, o mesmo arquivo enviado por outro usuário recebe o pendente existente (dedupe por hash) e o envio ao bucket é negado (409 na rota da E7) até o dono retomar | Baixa (uso interno, poucos usuários) | Consulta 8.3 identifica os pendentes; o dono pode reenviar o mesmo arquivo. Limpeza de pendentes antigos (ou reatribuição) fica para a feature de upload: [PROPOSTA], sem decisão |
+| R-D24 | Auditoria contornada por `TRUNCATE` | `TRUNCATE` não dispara triggers de linha: esvaziaria uma tabela sem `ROW_CHANGE` e sem passar pelo bloqueio de `DELETE` | Média (mitigado) | `TRUNCATE` revogado de todos os papéis da API em `public`, inclusive em tabelas futuras (default privileges), e `BEFORE TRUNCATE` nas quatro tabelas da FND (I-18; D-E4-12). Resíduo: o dono (`postgres`), como em R-D20 |
 
 ---
 
 ## 11. Divergências encontradas (Brain × plano × esta modelagem)
 
-O Brain e o plano **não foram editados** (regra da tarefa). Itens para o responsável/`engenheiro-software` registrarem. A coluna "Situação" reflete o plano revisão 7 (que não mudou nenhuma situação em relação à revisão 6) e o Brain em 23/10/2026.
+O Brain e o plano **não foram editados** (regra da tarefa). Itens para o responsável/`engenheiro-software` registrarem. A coluna "Situação" reflete o plano revisão 9, o Brain em 23/10/2026 (até a RAT-D021) e a implementação da E4, E7 e E8 (`04-implementacao.md`, `05-seguranca.md`).
 
 | # | Onde | Divergência | Sugestão | Situação |
 |---|---|---|---|---|
 | D-01 | Plano 14 (E2) e 19 | A DDL da FND é "só o transversal", mas `profiles.partner_id` precisa de FK para `partners`, que não está na lista | Incluir `partners` **mínima** (id, nome, ativo) na linha de base da FND, como nesta proposta (seção 3.3). Alternativa: criar `partner_id` só na feature Sócios (expand), o que deixa CA-06 sem testar o vínculo | **Aceita** pelo planejamento (plano rev. 6, E4) |
 | D-02 | Plano 6 ("Estrutura") | `profiles(user_id, role, partner_id NULL, active)` não diz o papel de um usuário recém-criado. O código antigo dava `SOCIO` | `role` anulável: nulo = sem papel (I-03). Atende o estado "sem vínculo" do CA-08 | Aberta (proposta desta modelagem) |
-| D-03 | Plano 6 / código de 07/10 | O código antigo permite ao Administrador alterar perfis pela API; o plano diz "procedimento documentado e auditado" | Sem `UPDATE` em `profiles` pela API na FND; procedimento `private.set_user_access` com motivo (6.3) | Aberta (proposta desta modelagem) |
+| D-03 | Plano 6 / código de 07/10 | O código antigo permite ao Administrador alterar perfis pela API; o plano diz "procedimento documentado e auditado" | Sem `UPDATE` em `profiles` pela API na FND; procedimento `private.set_user_access` auditado, com motivo opcional (RAT-D021) (6.3) | Implementada na E4 (proposta desta modelagem; gestão pela aplicação segue P-24) |
 | D-04 | Plano 9 | Lista de origens `ui/importação/sistema/script`; campo `created_at`; ação `LIQUIDATE` | Acrescentar `DIRECT` (SQL sem contexto). Acrescentar `seq`, `tx_id`, `actor_label`, `request_role`, `kind`. Manter o nome `created_at` (revisão 1 desta modelagem o havia trocado por `occurred_at`; voltou ao nome do plano), com padrão `clock_timestamp()`. Ação de liquidação = `SETTLE` em vez de `LIQUIDATE`, pelo mesmo radical de `SETTLED`/`competence_settlements` (lista do plano é exemplificativa) | Aberta (proposta desta modelagem) |
 | D-05 | Plano 9 | Correlação só por `set_config` na RPC | Também pelo cabeçalho `x-correlation-id` (escritas diretas em tabela via PostgREST) | Aberta (proposta desta modelagem) |
 | D-06 | Plano 8 | `sha256` "único", sem dizer o que acontece com registros excluídos logicamente | Unicidade inclui excluídos; reenvio devolve o registro existente (3.5) | Aberta (proposta desta modelagem) |
@@ -1516,13 +1568,40 @@ O Brain e o plano **não foram editados** (regra da tarefa). Itens para o respon
 | D-17 | Plano 1.3, linha 25 | `competency_companies` (valor esperado por cliente no mês) fora do Brain | Não incluído no modelo; decidir na feature Competências junto com P-10 e P-12 | Aberta (feature Competências) |
 | D-18 | Plano 6 (matriz) e P-15/P-20 | "Leitura geral" do Visualizador inclui abrir o arquivo do comprovante? | M-04. Esta proposta segue a matriz aprovada (Visualizador lê), sujeita à revisão de segurança | Aberta (M-04) |
 | D-19 | Brain 09 (ativo) × Brain 04 (ativo) × M-01 | **Dois documentos ativos do Brain apontam momentos diferentes para o rateio.** Brain 09 ("Estados", "Apurada"): "Motor de rateio executado e compensações calculadas", o que liga o rateio à **apuração**. Brain 04 ("Fluxo 3 — Lançamento manual"): "6. Sistema registra o recebimento. 7. Motor de rateio calcula os direitos econômicos.", o que liga o rateio ao **registro do recebimento** (o "Fluxo 5 — Apuração" do mesmo Brain 04 soma recebimentos e calcula o devido por sócio, sem mencionar o motor de rateio). A M-01 propõe gerar o snapshot na confirmação do recebimento (como em 07/10), em linha com o Brain 04 | Decidir M-01 citando os dois trechos (registro × apuração) e anotar no documento do Brain que ficar vencido. Se o rateio for na apuração, I-21 e I-25 mudam de gatilho (2.5, 4.2); a estrutura de `receipt_allocations` não muda. A decisão é do responsável | Aberta (M-01) |
-| D-20 | Plano 8 ("Upload mediado pelo servidor") | O modelo não obriga o caminho do servidor: Operador/Administrador conseguem chamar `register_proof_file` e o Storage direto, e o banco não confere hash nem tipo real | R-D18: aceite formal na FND + verificação posterior na feature de upload; decisão da `seguranca` (E8b) | Aberta (E8b) |
-| D-21 | Plano 8 ("Limites do Next 16") e P-15 | O plano conclui que o route handler resolve o limite do proxy, mas o route handler também passa pelo proxy quando o matcher cobre `/api` (corpo truncado sem erro acima de 10 MB); e a Vercel limita o corpo de Function a cerca de 4,5 MB (a confirmar). O valor provisório de 10 MiB não cabia | Limite provisório de 4 MiB; rota de upload fora do matcher; teste no tamanho máximo (3.5, 12.4) | Aberta (registrar no plano) |
-| D-22 | Plano 7.6 / 14 (E4: "novo seed local") | O plano não diz como o seed local atribui papéis; o `seed-dev` atual grava `profiles` pelo PostgREST, o que o modelo novo impede (escrita revogada, guarda exige motivo, schema `private` não exposto) | `seed-dev` em duas fases: usuários pela API admin do Auth local; papéis por `supabase db query --local -f` chamando `private.set_user_access` (7.2, passo 8) | Aberta (registrar no plano) |
+| D-20 | Plano 8 ("Upload mediado pelo servidor") | O modelo não obriga o caminho do servidor: Operador/Administrador conseguem chamar `register_proof_file` e o Storage direto, e o banco não confere hash nem tipo real | R-D18: aceite formal na FND + verificação posterior na feature de upload; decisão da `seguranca` (E8b) | **Encerrada na FND:** caminho direto aceito pela `seguranca` (SEG-E8B-02) com base na RAT-D020; a verificação posterior segue só como proposta |
+| D-21 | Plano 8 ("Limites do Next 16") e P-15 | O plano conclui que o route handler resolve o limite do proxy, mas o route handler também passa pelo proxy quando o matcher cobre `/api` (corpo truncado sem erro acima de 10 MB); e a Vercel limita o corpo de Function a cerca de 4,5 MB (a confirmar). O valor provisório de 10 MiB não cabia | Limite provisório de 4 MiB; rota de upload fora do matcher; teste no tamanho máximo (3.5, 12.4) | **Tratada na E7** com o limite de 4 MiB, mas por outro caminho: a rota ficou no matcher e o handler limita e conta os bytes (4 MiB + 64 KiB; D-E7-01). Limite da Vercel a confirmar no primeiro deploy |
+| D-22 | Plano 7.6 / 14 (E4: "novo seed local") | O plano não diz como o seed local atribui papéis; o `seed-dev` atual grava `profiles` pelo PostgREST, o que o modelo novo impede (escrita revogada, schema `private` não exposto) | `seed-dev` em duas fases: usuários pela API admin do Auth local; papéis por `supabase db query --local -f` chamando `private.set_user_access` (7.2, passo 8) | **Implementada na E4** (D-E4-07: uma única instrução) |
+
+### 11.1 Divergências da implementação incorporadas na revisão 4
+
+Registradas pelo desenvolvedor em `04-implementacao.md` e conferidas contra as migrations. Nenhuma muda regra de negócio; as que vêm de decisão do responsável citam a RAT-D.
+
+| # | Onde neste documento | O que mudou | Origem |
+|---|---|---|---|
+| D-E4-01 | 3.3 | `private.assert_admin_remains` é `SECURITY DEFINER` (a verificação diferida roda sob o papel de quem apagou o usuário) | Implementação |
+| D-E4-02 | 3.5 | `proof_files_before_insert` valida `mime_type` com mensagem própria antes de montar o caminho | Implementação |
+| D-E4-03 | 3.3, 6.2, 6.3 | Auxiliar `private.resolve_user_for_access(text)` (passos 4 e 5), sem `EXECUTE` para os papéis da API | Implementação |
+| D-E4-04 | 3.5 | `#variable_conflict use_column` em `register_proof_file` | Implementação |
+| D-E4-05 | 3.5 | `EXECUTE` de `proof_upload_allowed` e `proof_readable` para `authenticated` | Implementação |
+| D-E4-06 | 3.1 | `EXECUTE` de `normalize_alias` para `authenticated` e `service_role` | Implementação |
+| D-E4-07 | 7.2 | `seed-dev-access.sql` com uma única instrução | Limite da CLI 2.120 |
+| D-E4-08, D-E4-09 | 7.2 | Senha do seed sem valor padrão; sócios fictícios com UUID fixo | Implementação (RAT-D019) |
+| D-E4-10 | 3.5, I-16, R-D23, 8.3 | Upload só do próprio registro pendente (`uploaded_by = auth.uid()` em `proof_upload_allowed`) | SEG-E45-03 |
+| D-E4-11 | — | `coalesce` no CHECK do motivo da exclusão: **substituída** pela D-E4-13 (não existe mais) | QA-B1 |
+| D-E4-12 | 3.1, 3.3, 3.4, 3.5, 3.6, I-09, I-18, R-D24 | `TRUNCATE` revogado (inclusive default privileges) e `BEFORE TRUNCATE` em `partners`, `profiles` e `proof_files` | SEG-E45-08 |
+| D-E4-13 | 2.4, 3.2, 3.3, 3.5, 6.3, I-07, I-15, I-34 | Motivo opcional: sem `private.require_audit_reason`; motivo em branco vira `NULL`; CHECK da exclusão lógica só com a coerência entre `deleted_at` e `deleted_by` | [OFICIAL] RAT-D021 |
+| D-E7-01 | 3.5, R-D19, D-21 | `/api/*` sem sessão responde 401 JSON no proxy; a rota de upload ficou no matcher, com limite de corpo no handler | Implementação |
+| D-E7-02 | 3.5 | Tipo declarado obrigatório e exato; PDF só com `%PDF-` no byte 0 (escolha conservadora do desenvolvedor, fácil de relaxar) | Implementação |
+| D-E7-03 | 3.5 | Leitura por `GET /api/comprovantes/{id}/url` (JSON, 60 s); pendente ou excluído → 404 | Implementação |
+| D-E7-04 a D-E7-07 | — | Ajustes de teste e de harness (alias de `server-only`, filtros dos pgTAP 02 e 06, senha do seed no e2e, comprovantes de teste no banco local). Não afetam o modelo | Implementação |
+| D-E8-09 | 6.1 | Bootstrap como uma única instrução `select`, sem `begin/commit` | Implementação |
+| D-E8-10 | 5.1 | Gate de `db advisors` em `warn`; o `unindexed_foreign_keys` de `proof_files` (nível `info`) é esperado | Implementação |
 
 ---
 
 ## 12. Handoff ao desenvolvedor
+
+**Situação (revisão 4):** os itens de 12.1, 12.2 e 12.4 foram executados na E4 e na E7 (evidências e resultados em `04-implementacao.md`). As caixas ficam como registro do que foi pedido; os textos foram ajustados ao implementado (motivo opcional, TRUNCATE, upload só do próprio registro, rota no matcher). Para as próximas features, o que continua valendo como regra está em 12.5 e na nova 12.6.
 
 ### 12.1 E4 — linha de base do banco
 
@@ -1532,9 +1611,9 @@ O Brain e o plano **não foram editados** (regra da tarefa). Itens para o respon
 - [ ] Reaproveitar `set_updated_at`, `normalize_alias`, `prevent_mutation` e `to_money` sem mudar comportamento; não trazer `to_percentage`, `normalize_cnpj`, `is_valid_cnpj` nem os enums de 07/10.
 - [ ] Implementar os corpos de `private.bootstrap_first_admin` e `private.set_user_access` conforme a seção 6, com `revoke all` de `public`, `anon`, `authenticated` e `service_role`.
 - [ ] `revoke`/`grant` exatamente como 3.6 (lista de permissões; `alter default privileges for role postgres`).
-- [ ] Novo `seed.sql` só com sócios fictícios, sem percentuais e sem usuários (RAT-D019); novo `seed-dev` em duas fases (7.2, passo 8): usuários fictícios pela API admin do Auth **local**; papéis por `supabase db query --local -f scripts/sql/seed-dev-access.sql`, que chama `private.set_user_access` com motivo e `p_executor_label = 'seed-dev'`. Fixar `--local`; nunca `--linked`/`--db-url`. Confirmar que a conexão usa o papel `postgres`.
+- [ ] Novo `seed.sql` só com sócios fictícios, sem percentuais e sem usuários (RAT-D019); novo `seed-dev` em duas fases (7.2, passo 8): usuários fictícios pela API admin do Auth **local**; papéis por `supabase db query --local -f scripts/sql/seed-dev-access.sql`, que chama `private.set_user_access` com motivo informado (opcional pela RAT-D021) e `p_executor_label = 'seed-dev'`, numa única instrução (D-E4-07). Fixar `--local`; nunca `--linked`/`--db-url`. Confirmar que a conexão usa o papel `postgres`.
 - [ ] Toda tabela auditada tem PK `id uuid` (3.4); associações usam chave substituta + `unique` no par natural.
-- [ ] Guardas `profiles_guard_update` **e** `profiles_guard_insert`; `revoke insert, update, delete, truncate` em `profiles` e `audit_logs` de `service_role` (3.6).
+- [ ] Guardas `profiles_guard_update` **e** `profiles_guard_insert` (serialização; sem exigir motivo, RAT-D021); `revoke insert, update, delete, truncate` em `profiles` e `audit_logs` de `service_role`; `revoke truncate` geral e nos default privileges; `BEFORE TRUNCATE` nas quatro tabelas da FND (3.6; D-E4-12).
 - [ ] Bootstrap e `set_user_access`: `set_audit_context` antes de qualquer escrita (6.2, passo 3).
 - [ ] `private.handle_new_user` **literalmente** como em 3.3: não chama `set_audit_context`; define origem/rótulo só quando vazios e os restaura depois do `INSERT`; não toca motivo nem correlação (I-10b). Nenhuma outra função disparada por trigger chama `set_audit_context` (regra de 3.2, "Quem define o contexto").
 - [ ] `npm run db:types`.
@@ -1544,12 +1623,12 @@ O Brain e o plano **não foram editados** (regra da tarefa). Itens para o respon
 
 - [ ] **Catálogo:** toda tabela com trigger `audit_row_change` tem coluna `id` do tipo `uuid` (3.4); RLS ativo em 100% de `public`; `anon` sem privilégio em tabelas, sequências e funções; nenhuma coluna `real`/`double precision`; nenhuma tabela/coluna de 07/10 (I-37); `has_function_privilege` negado para `authenticated` em `bootstrap_first_admin` e `set_user_access`.
 - [ ] **Papéis (matriz do plano 6):** para cada um de `ADMINISTRATOR`, `OPERATOR`, `VIEWER`, `PARTNER`, sem papel e inativo — leitura de `partners`, `profiles` (próprio × alheio), `audit_logs`, `proof_files`; escrita negada em `profiles` e `partners` pela API.
-- [ ] **Perfis:** usuário novo nasce com `role` nulo; `PARTNER` sem `partner_id` falha; dois perfis com o mesmo sócio falham; mudar papel sem motivo falha; com motivo grava auditoria com `reason`; INSERT de perfil já com papel ou sócio sem motivo falha (também como `postgres`, sem contexto); `service_role` não insere, altera nem exclui perfis; exclusão em cascata a partir de `auth.users` continua funcionando para usuário não Administrador; remover/inativar o último Administrador falha (inclusive exclusão em cascata do Auth); `current_partner_id()` nulo para sócio inativo.
+- [ ] **Perfis:** usuário novo nasce com `role` nulo; `PARTNER` sem `partner_id` falha; dois perfis com o mesmo sócio falham; mudar papel sem motivo é aceito e grava auditoria com `reason` nulo; com motivo grava auditoria com `reason`; motivo só com espaços, tabs ou quebras de linha grava `reason` nulo (RAT-D021); INSERT de perfil já com papel ou sócio continua serializado e auditado; `authenticated` não insere nem altera perfis; `service_role` não insere, altera nem exclui perfis; exclusão em cascata a partir de `auth.users` continua funcionando para usuário não Administrador; remover/inativar o último Administrador falha (inclusive exclusão em cascata do Auth); `current_partner_id()` nulo para sócio inativo.
 - [ ] **Bootstrap:** placeholder rejeitado; e-mail inexistente rejeitado; usuário sem perfil prévio é promovido, com `ROW_CHANGE CREATE` + `ROW_CHANGE UPDATE` + `EVENT BOOTSTRAP_ADMIN`, todos com `source = SCRIPT`, motivo, `actor_label` e o mesmo `tx_id`; segunda execução retorna `ALREADY_ADMIN` sem novas linhas de auditoria; com outro Administrador ativo, falha; `EVENT BOOTSTRAP_ADMIN` e `ROW_CHANGE` com o mesmo `tx_id`, `source = SCRIPT`, `actor_label` preenchido.
 - [ ] **Auditoria:** `UPDATE`, `DELETE` e `TRUNCATE` em `audit_logs` falham (inclusive como `postgres`, para `UPDATE`/`DELETE`/`TRUNCATE` via trigger); `INSERT` direto em `audit_logs` por `authenticated` e `service_role` falha; trigger em tabela de teste sem coluna `id` falha com a mensagem da regra 3.4; `UPDATE` sem mudança não gera linha; diff só com colunas alteradas; `raw_extraction` aparece como `"[omitido]"`; `seq` cresce dentro da mesma transação; `source = DIRECT` em escrita sem contexto.
-- [ ] **Contexto × criação de usuário (I-10b):** (a) **sem contexto:** inserir um usuário em `auth.users` gera o `ROW_CHANGE CREATE` do perfil com `source = SYSTEM`, `actor_label = 'supabase-auth'` e `reason` nulo; em seguida, na mesma transação, uma escrita auditada sem contexto (ex.: `UPDATE` em `partners` como `postgres`) sai com `source = DIRECT` e `actor_label` nulo, e `current_setting('app.audit_source', true)` e `current_setting('app.audit_actor_label', true)` voltam vazios; (b) **com contexto:** depois de `private.set_audit_context('motivo de teste', 'SCRIPT', <uuid>, 'pgtap')`, inserir um usuário gera o `CREATE` do perfil com `source = SCRIPT`, o motivo, a correlação e `actor_label = 'pgtap'`; a escrita seguinte (ex.: mudar o papel desse perfil) passa pela guarda de motivo e grava os mesmos motivo, origem, correlação e rótulo; os quatro GUCs continuam iguais aos definidos. **Ordem nos arquivos pgTAP:** cada arquivo roda numa transação; os testes que conferem `source = DIRECT` ou motivo não dependem de os usuários de teste terem sido criados antes ou depois (a garantia é exatamente esta).
-- [ ] **Comprovantes:** campos controlados ignoram o que o cliente envia; caminho no formato `aaaa/mm/<id>.<ext>`; hash repetido detectado (CA-10); `STORED` sem objeto falha; com objeto de tamanho diferente falha; exclusão física falha; exclusão lógica só pelo Administrador, com motivo, e definitiva; `PARTNER` não lê `proof_files` nem objetos (CA-06).
-- [ ] **Storage:** INSERT em `storage.objects` só em caminho `PENDING_UPLOAD` e só para `ADMINISTRATOR`/`OPERATOR`; SELECT negado para `PARTNER`, sem papel e `anon`; UPDATE/DELETE negados para todos os papéis da aplicação.
+- [ ] **Contexto × criação de usuário (I-10b):** (a) **sem contexto:** inserir um usuário em `auth.users` gera o `ROW_CHANGE CREATE` do perfil com `source = SYSTEM`, `actor_label = 'supabase-auth'` e `reason` nulo; em seguida, na mesma transação, uma escrita auditada sem contexto (ex.: `UPDATE` em `partners` como `postgres`) sai com `source = DIRECT` e `actor_label` nulo, e `current_setting('app.audit_source', true)` e `current_setting('app.audit_actor_label', true)` voltam vazios; (b) **com contexto:** depois de `private.set_audit_context('motivo de teste', 'SCRIPT', <uuid>, 'pgtap')`, inserir um usuário gera o `CREATE` do perfil com `source = SCRIPT`, o motivo, a correlação e `actor_label = 'pgtap'`; a escrita seguinte (ex.: mudar o papel desse perfil) passa pela guarda e grava os mesmos motivo, origem, correlação e rótulo; os quatro GUCs continuam iguais aos definidos. **Ordem nos arquivos pgTAP:** cada arquivo roda numa transação; os testes que conferem `source = DIRECT` ou motivo não dependem de os usuários de teste terem sido criados antes ou depois (a garantia é exatamente esta).
+- [ ] **Comprovantes:** campos controlados ignoram o que o cliente envia; caminho no formato `aaaa/mm/<id>.<ext>`; hash repetido detectado (CA-10); `STORED` sem objeto falha; com objeto de tamanho diferente falha; exclusão física e `TRUNCATE` falham; exclusão lógica só pelo Administrador e definitiva, com motivo opcional (em branco grava `NULL`); `PARTNER` não lê `proof_files` nem objetos (CA-06).
+- [ ] **Storage:** INSERT em `storage.objects` só em caminho `PENDING_UPLOAD`, só para `ADMINISTRATOR`/`OPERATOR` e só pelo próprio `uploaded_by` (D-E4-10); SELECT negado para `PARTNER`, sem papel e `anon`; UPDATE/DELETE negados para todos os papéis da aplicação.
 
 ### 12.3 E6 — domínio (insumo para a feature Rateio)
 
@@ -1561,8 +1640,8 @@ O Brain e o plano **não foram editados** (regra da tarefa). Itens para o respon
 
 - [ ] Route handler conforme o fluxo de 3.5 (validação binária e SHA-256 no servidor; `upsert: false`; URL assinada curta).
 - [ ] Limite provisório de 4 MiB (P-15) no handler, na constraint e no bucket; confirmar na documentação atual da Vercel o limite de corpo de Function (cerca de 4,5 MB) e registrar a fonte.
-- [ ] Tirar a rota de upload do matcher de `src/proxy.ts` (a rota valida a sessão com `getClaims()`), ou justificar o ajuste de `proxyClientMaxBodySize` (experimental); conferir antes em `node_modules/next/dist/docs/`.
-- [ ] O handler compara os bytes recebidos com `Content-Length` e rejeita divergência (proteção contra corpo truncado sem erro).
+- [ ] Tirar a rota de upload do matcher de `src/proxy.ts` (a rota valida a sessão com `getClaims()`), ou justificar o ajuste de `proxyClientMaxBodySize` (experimental); conferir antes em `node_modules/next/dist/docs/`. **Implementado de outro modo:** a rota ficou no matcher e o handler limita o corpo (D-E7-01; ver 3.5 e R-D19).
+- [ ] O handler compara os bytes recebidos com `Content-Length` e rejeita divergência (proteção contra corpo truncado sem erro). Implementado com limite de 4 MiB + 64 KiB e contagem de bytes.
 - [ ] Testes de integração: upload exatamente no limite (aceito, hash igual ao do arquivo original) e 1 byte acima (rejeitado com erro claro, sem linha `PENDING_UPLOAD` criada).
 - [ ] Levar R-D18 (hash e tipo só garantidos no caminho do handler) para a revisão `seguranca` (E8b).
 - [ ] Enviar `x-correlation-id` em toda chamada ao Supabase a partir do servidor (E5) e confirmar em teste de integração que ele chega a `audit_logs.correlation_id`.
@@ -1573,6 +1652,17 @@ O Brain e o plano **não foram editados** (regra da tarefa). Itens para o respon
 - [ ] Nenhuma RPC pública `SECURITY DEFINER` sem justificativa escrita e teste por papel (plano 12).
 - [ ] Nenhuma migration aplicada em remoto; nenhum `db push` fora do workflow da E9.
 - [ ] Nenhum nome, e-mail ou documento real em seed, teste, script ou exemplo — RAT-D019.
+- [ ] Nenhuma função ou CHECK que exija motivo nas ações auditadas (RAT-D021); nada de recriar `private.require_audit_reason`.
+- [ ] Nenhuma concessão de `TRUNCATE` a `anon`, `authenticated` ou `service_role`.
+
+### 12.6 Regras herdadas pelas próximas features
+
+Classificação: [OFICIAL] onde a RAT-D é citada; o resto é [PROPOSTA] (as três primeiras regras já estavam no modelo aprovado no G1; o `BEFORE TRUNCATE` nas tabelas futuras é proposta nova desta revisão, ligada a D-E4-12).
+
+- [ ] Motivo: aceitar `p_reason` opcional nas RPCs auditadas, repassá-lo a `private.set_audit_context` (que já transforma motivo em branco em vazio) e gravar colunas `reason` próprias como anuláveis, com `nullif(btrim(..., E' \t\r\n'), '')` ([OFICIAL] RAT-D021).
+- [ ] Toda tabela auditada: PK `id uuid`, trigger `audit_row_change`, e, se bloquear `DELETE`, também `BEFORE TRUNCATE` com `private.prevent_truncate()` (3.4, I-18).
+- [ ] Só o ponto de entrada da operação chama `set_audit_context`; trigger nunca (3.2, I-10b).
+- [ ] Concessões por tabela e coluna na migration da feature (3.6); nunca editar as migrations `20261023000100` a `20261023000500` depois da primeira aplicação remota.
 
 ---
 
@@ -1610,7 +1700,7 @@ O Brain e o plano **não foram editados** (regra da tarefa). Itens para o respon
 
 ## 14. Gate G1
 
-**APTA PARA IMPLEMENTAÇÃO** — para o escopo da FND (E4 e E7), com as condições abaixo. Revisão 2: os 10 problemas da revisão independente foram tratados. Revisão 3: os 3 problemas restantes da segunda rodada (contexto de auditoria em `handle_new_user`, rótulo do papel Sócio em 3.3, evidência do Brain 04 em D-19/M-01) foram tratados (ver "Histórico de revisão").
+**APTA PARA IMPLEMENTAÇÃO** — para o escopo da FND (E4 e E7), com as condições abaixo. Revisão 2: os 10 problemas da revisão independente foram tratados. Revisão 3: os 3 problemas restantes da segunda rodada (contexto de auditoria em `handle_new_user`, rótulo do papel Sócio em 3.3, evidência do Brain 04 em D-19/M-01) foram tratados (ver "Histórico de revisão"). **Revisão 4:** a FND foi implementada (E4, E7, E8) e este documento foi sincronizado com as migrations; a sincronização não reabre o gate, porque só incorpora decisões do responsável (RAT-D020, RAT-D021) e ajustes de implementação já validados pela segurança e pelo QA. As condições abaixo ficam com a situação atualizada.
 
 Fundamentos (critério do agente: sem perda de dados não tratada, sem ambiguidade de cardinalidade, sem regra financeira indefinida **no escopo a implementar**):
 
@@ -1622,10 +1712,10 @@ Fundamentos (critério do agente: sem perda de dados não tratada, sem ambiguida
 
 Condições e ressalvas:
 
-- R-D12 (permissões da plataforma hospedada sobre `auth.users` e `storage`) deve ser verificado no início da E4; se algo estiver restrito, a alternativa já está descrita e não muda o modelo.
-- Seed local (D-22): confirmar na E4 que `supabase db query --local` conecta como `postgres`. Se não conectar, a alternativa é executar o mesmo SQL pelo `psql` do contêiner local do banco; o modelo não muda.
-- O limite de 4 MiB (P-15) é provisório; o limite de corpo da Vercel deve ser confirmado na documentação atual na E7 (R-D19).
-- R-D18 (hash e tipo do comprovante só garantidos no caminho do route handler) vai para a revisão `seguranca` (E8b). A proposta desta modelagem é aceitar o risco na FND e verificar o conteúdo na feature de upload. A decisão não muda a DDL da FND (no máximo acrescenta colunas por migration aditiva).
+- R-D12 (permissões da plataforma hospedada sobre `auth.users` e `storage`): confirmado no banco local na E4; a confirmação no projeto hospedado fica para a primeira aplicação remota (E9). Se algo estiver restrito, a alternativa já está descrita e não muda o modelo.
+- Seed local (D-22): implementado na E4 (D-E4-07).
+- O limite de 4 MiB (P-15) é provisório; o limite de corpo da Vercel continua a confirmar no primeiro deploy (R-D19).
+- R-D18: aceito pela `seguranca` (SEG-E8B-02) com base na RAT-D020. A verificação de conteúdo na feature de upload continua só proposta; se adotada, acrescenta colunas por migration aditiva.
 - Divergências abertas com o plano e o Brain (seção 11, coluna "Situação") devem ser registradas pelo `engenheiro-software`; nenhuma bloqueia a E4/E7.
 - O modelo conceitual das features (seção 2.4) **não** está apto para implementação enquanto as pendências de 13.1 e 13.2 marcadas como bloqueantes da respectiva feature (inclusive M-01 a M-05 e P-21, que continuam DECISÃO PENDENTE) não forem decididas. Cada feature passa pelo seu próprio gate de modelagem.
 
@@ -1638,6 +1728,7 @@ Condições e ressalvas:
 | 1 | 22/10/2026 | Versão inicial entregue para o G1 (plano revisão 5) |
 | 2 | 22/10/2026 | Correções da revisão independente (veredito "consistente com ressalvas", 10 problemas), sobre o plano revisão 6. Detalhe abaixo |
 | 3 | 23/10/2026 | Correções da segunda rodada da revisão independente (veredito "consistente com ressalvas": 1 item parcial e 3 problemas novos, um deles a mesma pendência do item parcial), sobre o plano revisão 7, antes da implementação na E4. Detalhe abaixo |
+| 4 | 23/10/2026 | Sincronização com a linha de base implementada (E4, E7 e E8; migrations `20261023000100` a `20261023000500`), sobre o plano revisão 9 e o Brain até a RAT-D021. Incorpora D-E4-01 a D-E4-13, D-E7-01 a D-E7-03 e D-E8-09/D-E8-10. Nenhuma regra de negócio nova; nenhuma proposta virou decisão. Detalhe abaixo |
 
 Mudanças da revisão 2, por problema apontado:
 
@@ -1665,3 +1756,16 @@ Mudanças da revisão 3, por observação:
 3. **D-19 e M-01 citavam só o Brain 09 (baixa).** As duas passam a citar também o Brain 04 (ativo), "Fluxo 3 — Lançamento manual", passos 6 e 7 ("Sistema registra o recebimento. Motor de rateio calcula os direitos econômicos."), e registram que dois documentos ativos do Brain apontam momentos diferentes (registro × apuração). M-01 continua DECISÃO PENDENTE; a decisão é do responsável.
 
 Outras mudanças da revisão 3: cabeçalho aponta para o plano revisão 7 (só muda a sequência E4/E5; nenhuma situação da seção 11 mudou); gate atualizado. Nenhuma pendência foi resolvida e nenhuma regra de negócio mudou.
+
+Mudanças da revisão 4 (sincronização com o implementado):
+
+1. **Motivo opcional ([OFICIAL] RAT-D021; D-E4-13, que substitui D-E4-11).** Retirada `private.require_audit_reason` (3.2) e as chamadas nas guardas `profiles_guard_update` e `profiles_guard_insert` (3.3). `set_audit_context` e `audit_insert` transformam motivo em branco (espaços, tabs, `CR`, `LF`) em `NULL`. CHECK `proof_files_deletion_consistency` exige só a coerência entre `deleted_at` e `deleted_by`; a guarda de `proof_files` grava o motivo da exclusão quando informado e transforma o em branco em `NULL` (3.5). `set_user_access` aceita `p_reason` vazio (6.3). Ajustados F-02, I-07, I-15, I-34, R-D20, D-03, D-22, 12.1 e 12.2. No modelo conceitual das features (2.4), `competence_status_events.reason` e `competence_reopenings.reason` passam a anuláveis e a reabertura deixa de exigir motivo, como a própria RAT-D021 indica.
+2. **Bootstrap como uma única instrução (D-E8-09).** 6.1 mostra só o `select`, sem `begin/commit`; motivo fixo da função registrado como informado, não exigido; script de conferência citado. Auxiliar `resolve_user_for_access` (D-E4-03) citada em 3.3, 6.2 e 6.3.
+3. **Upload só do próprio registro (D-E4-10).** `proof_upload_allowed` exige `uploaded_by = auth.uid()` (3.5); I-16 ampliada; consequência registrada como risco novo R-D23 (pendente abandonado bloqueia o mesmo arquivo para outros usuários) e na consulta 8.3. A limpeza de pendentes continua proposta para a feature de upload, sem decisão.
+4. **`TRUNCATE` revogado e bloqueado por trigger (D-E4-12).** `revoke truncate` geral e nos default privileges (3.6); `BEFORE TRUNCATE` em `partners`, `profiles` e `proof_files` além de `audit_logs` (3.1, 3.3, 3.4, 3.5); F-04 e I-09 ajustadas; invariante nova I-18; risco R-D24; regra proposta para as tabelas futuras (3.4, 12.6).
+5. **Conferência de `storage.objects` ao concluir o upload.** O fluxo de 3.5 descreve o que a guarda confere (bucket, nome, `metadata.size`, `metadata.mimetype`) e o erro `23514`; `complete_proof_file_upload` com `no_data_found` para id inexistente.
+6. **Outros ajustes de implementação:** `assert_admin_remains` `SECURITY DEFINER` (D-E4-01); validação de `mime_type` no `BEFORE INSERT` (D-E4-02); `#variable_conflict` (D-E4-04); `EXECUTE` das funções de política de storage (D-E4-05) e de `normalize_alias` (D-E4-06); seed em uma instrução, senha sem padrão e sócios fictícios (D-E4-07 a D-E4-09); rota de upload no matcher do proxy com limite de corpo no handler (D-E7-01; R-D19, D-21 e 12.4 atualizados); tipo declarado estrito (D-E7-02); leitura por `GET /api/comprovantes/{id}/url` (D-E7-03); advisor `unindexed_foreign_keys` em nível `info` (D-E8-10, 5.1).
+7. **Situação de riscos e divergências.** R-D18 e D-20: aceitos pela `seguranca` (SEG-E8B-02) com base na RAT-D020; a verificação de conteúdo segue só proposta. R-D12: confirmado no local, hospedado na E9. Nova seção 11.1 com a tabela das divergências incorporadas e nova 12.6 com as regras herdadas pelas próximas features.
+8. **Cabeçalho, seção 3, seção 7 e gate:** o documento passa a declarar as migrations como fonte da DDL; seção 7 marcada como executada (migrations ainda não aplicadas em ambiente remoto); gate com as condições atualizadas, sem reabertura.
+
+Pendências inalteradas: M-01 a M-05, P-02b, P-15, P-17 (proposta da seção 9), P-18, P-21 e P-24 continuam DECISÃO PENDENTE. Nenhum trecho do Brain ou do plano foi editado.

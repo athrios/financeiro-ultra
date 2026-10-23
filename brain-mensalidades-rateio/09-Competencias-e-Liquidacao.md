@@ -45,7 +45,7 @@ Deve registrar:
 
 - usuário;
 - data/hora;
-- motivo;
+- motivo, quando informado ([[11-Decisoes#RAT-D021 — Motivo opcional nas ações auditadas]]);
 - estado anterior;
 - impacto financeiro.
 

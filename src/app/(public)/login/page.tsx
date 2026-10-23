@@ -17,11 +17,6 @@ function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-const NOTICES = {
-  "sessao-expirada": { tone: "info", text: "Sua sessão expirou. Entre novamente para continuar." },
-  "senha-definida": { tone: "success", text: "Senha definida. Entre com a nova senha." },
-} as const;
-
 export default function LoginPage({ searchParams }: { searchParams: SearchParams }) {
   // searchParams só existe em tempo de requisição (Cache Components): cada dado que depende dele
   // fica atrás do seu <Suspense>. O formulário em si fica fora, para o envio sem JavaScript
@@ -55,8 +50,9 @@ export default function LoginPage({ searchParams }: { searchParams: SearchParams
 
 async function LoginNotice({ searchParams }: { searchParams: SearchParams }) {
   const aviso = first((await searchParams).aviso);
-  const notice = aviso === "sessao-expirada" || aviso === "senha-definida" ? NOTICES[aviso] : null;
-  return notice ? <FormMessage tone={notice.tone}>{notice.text}</FormMessage> : null;
+  return aviso === "sessao-expirada" ? (
+    <FormMessage tone="info">Sua sessão expirou. Entre novamente para continuar.</FormMessage>
+  ) : null;
 }
 
 async function NextField({ searchParams }: { searchParams: SearchParams }) {

@@ -10,8 +10,11 @@ import { ConfirmForm, InvalidLink } from "./confirm-form";
 export const metadata: Metadata = {
   title: "Confirmar link",
   // O endereço traz um token de uso único: não deve ser indexado nem enviado como referência.
+  // "strict-origin" manda no máximo o domínio (nunca o caminho com o token). Não usar
+  // "no-referrer": ele faz o navegador enviar `Origin: null` no envio do formulário sem
+  // JavaScript (ou antes da hidratação) e o Next recusa a Server Action (500).
   robots: { index: false, follow: false },
-  referrer: "no-referrer",
+  referrer: "strict-origin",
 };
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;

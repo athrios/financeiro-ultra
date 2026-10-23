@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isPublicPath, redirectsWhenAuthenticated, skipsLoginRedirect } from "./route-access";
+import { isApiPath, isPublicPath, redirectsWhenAuthenticated, skipsLoginRedirect } from "./route-access";
 
 describe("rotas públicas do proxy (P-11)", () => {
   it("/login, /recuperar-senha e /auth/confirm são públicas", () => {
@@ -32,5 +32,12 @@ describe("rotas públicas do proxy (P-11)", () => {
     expect(redirectsWhenAuthenticated("/auth/confirm")).toBe(false);
     expect(redirectsWhenAuthenticated("/definir-senha")).toBe(false);
     expect(redirectsWhenAuthenticated("/")).toBe(false);
+  });
+});
+
+describe("endpoints de API", () => {
+  it("/api e o que vem abaixo são API; prefixos parecidos não", () => {
+    for (const path of ["/api", "/api/comprovantes", "/api/comprovantes/x/url"]) expect(isApiPath(path)).toBe(true);
+    for (const path of ["/", "/apix", "/apificar", "/competencias/api"]) expect(isApiPath(path)).toBe(false);
   });
 });

@@ -1,13 +1,13 @@
 -- =============================================================================
--- pgTAP · Perfis: criação sem papel, guardas de acesso (motivo, sem autopromoção,
+-- pgTAP · Perfis: criação sem papel, guardas de acesso (motivo opcional, sem autopromoção,
 -- nunca zero Administradores ativos), exclusão em cascata e current_partner_id().
--- Rastreio: CA-07, CA-08, CA-09 · I-03, I-04, I-05, I-07, I-08, R-D20.
+-- Rastreio: CA-07, CA-08, CA-09 (revisado, RAT-D021) · I-03, I-04, I-05, I-07, I-08, R-D20.
 -- =============================================================================
 begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(29);
+select plan(33);
 
 -- Independência dos dados locais: o banco de teste pode ter os Administradores do seed:dev. Eles
 -- são inativados (com motivo) só dentro desta transação, desfeita no rollback, para que a trava
@@ -40,14 +40,28 @@ select is((select partner_id from public.profiles where id = 'f1000000-0000-4000
   'Usuário novo nasce sem sócio');
 
 -- -----------------------------------------------------------------------------
--- Atribuição de papel exige motivo (I-07, CA-09)
+-- Motivo opcional (RAT-D021, CA-09 revisado): a ação funciona sem motivo e fica auditada com reason nulo.
+-- Usa o usuário 5 (descartável); a atribuição com motivo informado é provada mais abaixo.
 -- -----------------------------------------------------------------------------
-select throws_ok(
-  $$update public.profiles set role = 'ADMINISTRATOR' where id = 'f1000000-0000-4000-8000-000000000001'$$,
-  '23514', 'Esta operação exige motivo.', 'Mudar papel sem motivo falha (também como postgres)');
-select throws_ok(
-  $$update public.profiles set active = false where id = 'f1000000-0000-4000-8000-000000000003'$$,
-  '23514', 'Esta operação exige motivo.', 'Inativar sem motivo falha');
+select lives_ok(
+  $$update public.profiles set role = 'OPERATOR' where id = 'f1000000-0000-4000-8000-000000000005'$$,
+  'Mudar papel sem motivo funciona (RAT-D021)');
+select is(
+  (select reason from public.audit_logs
+    where entity = 'profile' and entity_id = 'f1000000-0000-4000-8000-000000000005'
+      and kind = 'ROW_CHANGE' and action = 'UPDATE' order by seq desc limit 1),
+  null, 'A mudança de papel sem motivo fica auditada com reason nulo');
+select lives_ok(
+  $$update public.profiles set active = false where id = 'f1000000-0000-4000-8000-000000000005'$$,
+  'Inativar sem motivo funciona (RAT-D021)');
+select lives_ok(
+  $$select private.set_user_access('pgtap-socio2@example.com', 'VIEWER', null, false, E'  \t\r\n ', 'pgtap')$$,
+  'set_user_access com motivo só em branco funciona (RAT-D021)');
+select is(
+  (select count(*) from public.audit_logs
+    where entity = 'profile' and entity_id = 'f1000000-0000-4000-8000-000000000005'
+      and reason is not null),
+  0::bigint, 'Motivo em branco vira NULL na auditoria (nenhuma linha do usuário 5 com motivo)');
 
 select lives_ok(
   $$select private.set_user_access('pgtap-adm1@example.com', 'ADMINISTRATOR', null, true, 'primeiro admin de teste', 'pgtap')$$,
@@ -102,12 +116,22 @@ select lives_ok(
 -- -----------------------------------------------------------------------------
 select private.set_audit_context(null, null, null, null);
 delete from public.profiles where id = 'f1000000-0000-4000-8000-000000000003';   -- OPERATOR, não é o último admin
-select throws_ok(
+-- RAT-D021: sem motivo, a guarda de INSERT não bloqueia (a serialização e a auditoria continuam).
+-- A proteção contra autopromoção é por privilégio de coluna e RLS (testes 02), não pelo motivo.
+select lives_ok(
   $$insert into public.profiles (id, role) values ('f1000000-0000-4000-8000-000000000003', 'OPERATOR')$$,
-  '23514', 'Esta operação exige motivo.', 'INSERT de perfil já com papel, sem motivo, falha (também como postgres)');
-select throws_ok(
-  $$insert into public.profiles (id, partner_id) values ('f1000000-0000-4000-8000-000000000003', 'f2000000-0000-4000-8000-000000000002')$$,
-  '23514', 'Esta operação exige motivo.', 'INSERT de perfil já com sócio, sem motivo, falha');
+  'INSERT de perfil já com papel, sem motivo, funciona e é auditado (RAT-D021)');
+select is(
+  (select reason from public.audit_logs
+    where entity = 'profile' and entity_id = 'f1000000-0000-4000-8000-000000000003'
+      and kind = 'ROW_CHANGE' and action = 'CREATE' order by seq desc limit 1),
+  null, 'O CREATE do perfil sem motivo fica auditado com reason nulo');
+delete from public.profiles where id = 'f1000000-0000-4000-8000-000000000003';
+insert into public.partners (id, name) values ('f2000000-0000-4000-8000-000000000003', 'Sócio Teste C');
+select lives_ok(
+  $$insert into public.profiles (id, partner_id) values ('f1000000-0000-4000-8000-000000000003', 'f2000000-0000-4000-8000-000000000003')$$,
+  'INSERT de perfil já com sócio, sem motivo, funciona (RAT-D021)');
+delete from public.profiles where id = 'f1000000-0000-4000-8000-000000000003';
 select lives_ok(
   $$insert into public.profiles (id) values ('f1000000-0000-4000-8000-000000000003')$$,
   'INSERT de perfil sem papel e sem sócio é aceito (caminho do Auth e dos procedimentos)');

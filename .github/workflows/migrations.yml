@@ -1,0 +1,92 @@
+name: Migrations e publicação em Production
+
+# FND-001, E8 (plano, seção 10: "Migrations x deploy"). É a ÚNICA forma de aplicar migrations no
+# banco hospedado e de publicar Production:
+#   1. só é disparado à mão (workflow_dispatch), pelo responsável, na aba Actions;
+#   2. o job só roda se quem disparou for o usuário do responsável e se a execução for da `main`;
+#   3. aplica as migrations (`supabase db push`) e SÓ DEPOIS pede o deploy de Production à Vercel,
+#      por deploy hook. A Production não publica sozinha (veja vercel.json).
+#
+# Segredos do repositório (Settings > Secrets and variables > Actions; nomes, nunca valores aqui):
+#   SUPABASE_ACCESS_TOKEN     token de acesso pessoal do Supabase, com o menor escopo possível
+#   SUPABASE_PROJECT_REF      identificador (ref) do projeto Supabase de São Paulo
+#   SUPABASE_DB_PASSWORD      senha do banco do projeto
+#   VERCEL_DEPLOY_HOOK_URL    URL do deploy hook da Vercel (branch main -> Production)
+#
+# Este workflow nunca roda `supabase config push`: o config.toml versionado serve ao ambiente
+# local (site_url e redirect URLs de 127.0.0.1) e SOBRESCREVERIA a configuração do Auth hospedado.
+
+on:
+  workflow_dispatch:
+    inputs:
+      somente_simular:
+        description: "Só simular (db push --dry-run): não altera o banco nem publica nada"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publicacao-producao
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    name: Migrations e deploy de Production
+    # `actor` é quem disparou; `triggering_actor` é quem reexecutou. Os dois precisam ser o responsável.
+    if: >-
+      github.actor == 'athrios' &&
+      github.triggering_actor == 'athrios' &&
+      github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Ligar ao projeto Supabase
+        run: npx supabase link --project-ref "$SUPABASE_PROJECT_REF" --yes
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: Migrations pendentes (simulação)
+        run: npx supabase db push --linked --dry-run
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: Aplicar as migrations
+        if: ${{ !inputs.somente_simular }}
+        run: npx supabase db push --linked --yes
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      # Só chega aqui se as migrations foram aplicadas sem erro (cada passo falha o job).
+      - name: Publicar Production na Vercel (deploy hook)
+        if: ${{ !inputs.somente_simular }}
+        shell: bash
+        run: |
+          if [ -z "$VERCEL_DEPLOY_HOOK_URL" ]; then
+            echo "Segredo VERCEL_DEPLOY_HOOK_URL ausente. As migrations foram aplicadas; publique a Production manualmente depois de resolver." >&2
+            exit 1
+          fi
+          # A URL é segredo: sem -v, sem eco. Mostra só o código HTTP e a resposta curta da Vercel.
+          status=0
+          curl --silent --show-error --fail-with-body --max-time 30 -X POST "$VERCEL_DEPLOY_HOOK_URL" \
+            --output "$RUNNER_TEMP/hook.out" || status=$?
+          head -c 400 "$RUNNER_TEMP/hook.out" || true
+          echo
+          exit $status
+        env:
+          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}

@@ -26,12 +26,23 @@ export const SESSION_CHECKED_BY_PAGE = ["/definir-senha"] as const;
  */
 export const REDIRECT_WHEN_AUTHENTICATED = ["/login", "/recuperar-senha"] as const;
 
+/**
+ * Endpoints de API (route handlers em /api). Sem sessão, o proxy responde 401 em JSON em vez de
+ * redirecionar ao /login: quem chama uma API não é uma pessoa navegando. O próprio handler
+ * revalida a sessão e o papel.
+ */
+export const API_PATH_PREFIX = "/api";
+
 export function matchesPath(pathname: string, paths: readonly string[]): boolean {
   return paths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
 }
 
 export function isPublicPath(pathname: string): boolean {
   return matchesPath(pathname, PUBLIC_PATHS);
+}
+
+export function isApiPath(pathname: string): boolean {
+  return pathname === API_PATH_PREFIX || pathname.startsWith(`${API_PATH_PREFIX}/`);
 }
 
 /** O proxy não redireciona ao /login nestas rotas (públicas ou com verificação própria). */

@@ -1,2 +1,2 @@
 - [Restrições do workflow](project_restricoes-workflow.md) — nunca ler .acessos/; sem git/remotos; Brain e 01-plano só leitura
-- [Modelagem FND-001](project_modelagem-fnd-001.md) — rev. 3: P-17, id uuid auditado, guardas de profiles, contexto de auditoria em trigger, M-01..M-05
+- [Modelagem FND-001](project_modelagem-fnd-001.md) — rev. 4 sincronizada com migrations; motivo opcional (RAT-D021); M-01..M-05

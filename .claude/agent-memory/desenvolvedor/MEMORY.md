@@ -1,3 +1,5 @@
 - [Armadilhas da E4 (banco/seed/pgTAP)](project_fnd001-e4-gotchas.md) — db query uma instrução, constraint trigger diferido, tsx, senha do seed
 - [Armadilhas da E5 (Next 16/Supabase/smoke)](project_fnd001-e5-gotchas.md) — connection() no cliente Supabase, POST sem JS em PPR, regex do smoke, pgTAP com seed
 - [Correções E4/E5 (amr, PPR sem JS, sidebar, legado)](project_fnd001-correcoes-e4e5.md) — armadilhas da rodada pós-validação
+- [Armadilhas da E7 (upload, e2e HTTP, corpo do Next)](project_fnd001-e7-gotchas.md) — limite de corpo no handler, DEV_SEED_PASSWORD, pgTAP com dados reais
+- [Armadilhas da E8 (smoke HTTP, CI, workflows, db query)](project_fnd001-e8-gotchas.md) — pages.ts sem JS, keep-alive, db query 1 instrução, -x do supabase start

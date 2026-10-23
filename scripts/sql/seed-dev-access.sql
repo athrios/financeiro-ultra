@@ -6,8 +6,8 @@
 --
 -- Uma única instrução: a CLI envia o arquivo como comando preparado e não aceita
 -- várias instruções. A instrução roda numa única transação, na ordem abaixo
--- (o Administrador primeiro). Cada chamada define motivo, origem SCRIPT e rótulo
--- 'seed-dev' e grava ROW_CHANGE + EVENT ACCESS_CHANGE na auditoria. É idempotente.
+-- (o Administrador primeiro). Cada chamada define origem SCRIPT, rótulo
+-- 'seed-dev' e (opcional, RAT-D021; aqui informado) o motivo, e grava ROW_CHANGE + EVENT ACCESS_CHANGE na auditoria. É idempotente.
 -- O usuário sem papel (semvinculo@example.com) é criado pelo script e não recebe papel.
 -- =============================================================================
 select

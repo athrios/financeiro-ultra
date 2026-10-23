@@ -142,7 +142,7 @@ begin
   if new.role is distinct from old.role
      or new.partner_id is distinct from old.partner_id
      or new.active is distinct from old.active then
-    perform private.require_audit_reason();     -- motivo obrigatório (exemplo do CA-09)
+    -- RAT-D021: o motivo é opcional. A guarda não o exige; quando informado, vai para a auditoria (CA-09).
     -- Serializa mudanças de acesso: evita que duas transações concorrentes
     -- removam, cada uma, "o outro" Administrador.
     perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('financeiro_ultra.access_change'));
@@ -156,12 +156,12 @@ create trigger profiles_guard_update before update on public.profiles
 -- Guarda de criação de perfil: fecha o caminho "apagar o perfil e reinseri-lo já com papel"
 -- (ou inserir com papel para um usuário sem perfil). O trigger do Auth e os procedimentos
 -- criam o perfil SEM papel e SEM sócio; só então o UPDATE (com a guarda acima) atribui acesso.
--- Inserir já com papel ou sócio exige o mesmo contexto com motivo e a mesma serialização.
+-- Inserir já com papel ou sócio exige a mesma serialização (RAT-D021: motivo opcional;
+-- quando informado, vai para a auditoria).
 create function private.profiles_guard_insert()
 returns trigger language plpgsql set search_path = '' as $$
 begin
   if new.role is not null or new.partner_id is not null then
-    perform private.require_audit_reason();
     perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('financeiro_ultra.access_change'));
   end if;
   return new;
@@ -310,14 +310,11 @@ create function private.set_user_access(
 ) returns void
 language plpgsql set search_path = '' as $$
 declare
-  v_reason  text := pg_catalog.btrim(coalesce(p_reason, ''));
+  v_reason  text := pg_catalog.btrim(coalesce(p_reason, ''), E' \t\r\n');   -- RAT-D021: opcional
   v_label   text := pg_catalog.btrim(coalesce(p_executor_label, ''));
   v_user_id uuid;
   v_before  public.profiles;
 begin
-  if v_reason = '' then
-    raise exception 'Motivo é obrigatório.' using errcode = 'invalid_parameter_value';
-  end if;
   if v_label = '' or pg_catalog.char_length(v_label) > 200 then
     raise exception 'Identificação de quem executa é obrigatória (até 200 caracteres).'
       using errcode = 'invalid_parameter_value';

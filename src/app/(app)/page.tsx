@@ -28,7 +28,7 @@ export default async function DashboardPage() {
         title="Dashboard"
         description={name ? `Olá, ${name} · ${roleLabel(profile.role)}` : roleLabel(profile.role)}
       />
-      <EmptyState icon={LayoutDashboard} title="Os indicadores aparecerão aqui">
+      <EmptyState icon={LayoutDashboard} title="O resumo da competência aparecerá aqui">
         <p>
           Quando os módulos de recebimentos, apuração e compensações forem liberados, este painel mostrará o que
           exige a sua decisão.

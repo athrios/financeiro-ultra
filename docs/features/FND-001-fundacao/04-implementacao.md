@@ -399,3 +399,300 @@ Rodada de correções dos achados de `seguranca` (SEG-E45-xx) e `qa` (QA-xx) sob
 - **`seguranca`:** revalidar SEG-E45-01, 02, 03, 04, 06, 07, 08 e 10 (`link-session.ts` e `definir-senha/actions.ts` em especial).
 - **`qa`:** revalidar QA-B1, QA-LOG, QA-UX51, QA-SIDEBAR e QA-LEGADO; refazer convite e recuperação em navegador real.
 - A FND-001 só fecha com a revisão de `seguranca` e `qa`.
+
+## Ajustes pós-validação (RAT-D021 e QA)
+
+| Campo | Valor |
+|---|---|
+| Data | 23/10/2026 |
+| Agente | `desenvolvedor` |
+| Plano | `01-plano.md` (revisão 9) |
+| Base | Decisões do responsável após a validação de E4/E5: RAT-D020 (uso interno) e RAT-D021 (motivo opcional); achados baixos do QA |
+| Status | Implementado e verificado localmente. **Sem aprovação declarada**: depende da revisão de `seguranca` e `qa` |
+
+### Itens
+
+| Item | O que foi feito | Arquivos |
+|---|---|---|
+| A1 · RAT-D021, motivo opcional | O banco deixou de exigir motivo em toda ação. `profiles_guard_update` e `profiles_guard_insert` não chamam mais a verificação de motivo (mantêm só a trava de serialização). `private.set_user_access` perdeu o `raise 'Motivo é obrigatório.'`. O bootstrap já gravava um motivo fixo e não foi alterado. O CHECK `proof_files_deletion_consistency` passou a exigir só a coerência entre `deleted_at` e `deleted_by` (e continua recusando `deletion_reason` sem exclusão). Motivo vazio ou só com espaço, tab, `\r` ou `\n` vira `NULL` em três pontos: `private.set_audit_context` (GUC), `private.audit_insert` (`audit_logs.reason`) e o guard de UPDATE de `proof_files` (`deletion_reason`). Motivo informado continua gravado (sem as bordas em branco). `private.require_audit_reason` ficou sem uso e foi **retirada** da linha de base (função, `revoke` e `grant`). | `supabase/migrations/20261023000200_audit.sql`, `20261023000300_access.sql`, `20261023000400_proof_files.sql` |
+| A1 · testes | `03_profiles` (plan 29 para 33): mudar papel e inativar sem motivo funcionam e saem auditados com `reason` nulo; `set_user_access` com motivo só de espaços, tab e quebras funciona e grava `NULL`; INSERT de perfil já com papel ou com sócio sem motivo funciona (auditado, `reason` nulo). `04_bootstrap` (28 para 29): `set_user_access` sem motivo funciona e grava ROW_CHANGE + EVENT com `reason` nulo, origem SCRIPT e rótulo. `06_proof_files_storage` (54 para 57): exclusão lógica com motivo em branco vira `NULL`, sem motivo funciona (autor e data do servidor), motivo sem exclusão falha no CHECK, motivo informado é gravado. `01_catalog`: `require_audit_reason` saiu da lista de funções executáveis por `authenticated`. O motivo informado continua provado em `03_profiles` ("primeiro admin de teste") e `05_audit`. | `supabase/tests/database/01`, `02`, `03`, `04`, `06` |
+| A1 · textos | Comentários que falavam em motivo obrigatório ajustados | `scripts/seed-dev.ts`, `scripts/sql/seed-dev-access.sql`, `README.md` |
+| A2 · vocabulário (RAT-D017, UX-02) | Título do estado vazio do Dashboard: "O resumo da competência aparecerá aqui" (era "Os indicadores aparecerão aqui"). Conferido: não sobrou "indicador" em texto de interface em `src/` (restam só um comentário de `logger.ts` e a regex do teste de vocabulário). | `src/app/(app)/page.tsx` |
+| A3 · status que sobrava | **Causa:** com `cacheComponents` o roteador do cliente mantém a tela anterior oculta no DOM (Activity). A região `role="status"` de "Senha definida / Sua senha foi salva." continuava no documento atrás de "Sem acesso ativo" (invisível a olho nu, mas presente na árvore e em consultas ao DOM). **Correção:** o botão "Ir para o Financeiro Ultra" passou de `<Link>` para um link de documento (`<a href="/">`), que descarta o estado antigo e recarrega a sessão que acabou de mudar. | `src/app/(auth-flow)/definir-senha/set-password-form.tsx` |
+
+### Comprovação do A3 (Chrome headless por CDP, `next start` na porta 3001)
+
+Harness `scratchpad/ev/pwd-status.cjs` (convite pela API admin, e-mail no Mailpit, aceitar, definir senha, "Ir para o Financeiro Ultra", "Verificar novamente"). Medida: textos `[role=status]` e presença de "Sua senha foi salva" no DOM.
+
+| Momento | Antes (código anterior) | Depois |
+|---|---|---|
+| Tela seguinte, `document.body.textContent` contém "Sua senha foi salva" | sim (região oculta `hiddenAncestor: true`) | **não** |
+| `h1` no DOM da tela seguinte | "Sem acesso ativo", "Senha definida", "Você foi convidado" (os dois últimos ocultos) | "Sem acesso ativo" |
+| Após "Verificar novamente" | mesma região oculta ainda presente | só "Verificamos novamente. Seu acesso continua sem alteração." |
+
+Conferido também por HTTP com o Administrador do seed: o Dashboard traz "O resumo da competência aparecerá aqui" e não traz "indicadores".
+
+### Verificação (resultados reais, 23/10/2026)
+
+| Comando | Resultado |
+|---|---|
+| `npm run lint` | sem erros nem avisos |
+| `npm run typecheck` | sem erros |
+| `npm test` | 16 arquivos, 221 testes, todos passaram |
+| `npm run build` | concluído (rotas PPR e estáticas como antes) |
+| `npx supabase db reset` | linha de base aplicada do zero (cinco migrations) |
+| `npm run db:test` (após o reset) | 6 arquivos, 237 testes, PASS (eram 229; +8 pelos casos do RAT-D021) |
+| `npm run seed:dev` | usuários fictícios e papéis atribuídos |
+| `npm run db:test` (após o seed) | 6 arquivos, 237 testes, PASS |
+| `npx supabase db lint` | No schema errors found |
+| `npx supabase db advisors --local` | No issues found |
+| `npm run db:types` | executado em arquivo temporário: idêntico ao versionado, exceto o fim de linha (CRLF do Windows); o arquivo `src/types/database.types.ts` não foi alterado (a função removida está no schema `private`, fora dos tipos) |
+
+Um teste falhou na primeira execução (`04_bootstrap`: "papel anterior (nulo)"): o usuário passou a ter OPERATOR, atribuído sem motivo logo acima, antes de virar VIEWER. A expectativa foi corrigida para `OPERATOR`.
+
+### Divergência nova
+
+| # | Onde | Divergência | Motivo |
+|---|---|---|---|
+| D-E4-13 | 02, seção 3.2 (`private.require_audit_reason`), seção 6 (`profiles_guard_update`, `profiles_guard_insert`, `set_user_access`), `proof_files_deletion_consistency` e CA-09 | Motivo opcional. A função `private.require_audit_reason` e o `raise 'Motivo é obrigatório.'` foram retirados; o CHECK da exclusão lógica exige só `deleted_at` e `deleted_by` coerentes; motivo em branco vira `NULL`; motivo informado é gravado. Esta divergência **substitui** a D-E4-11 (o `coalesce` do motivo no CHECK deixou de existir). O `02` ainda descreve a versão antiga | RAT-D021. Não há dado a migrar: as migrations da linha de base não foram aplicadas em nenhum ambiente remoto |
+
+### Pendências e observações
+
+- O `02-modelagem-dados.md` (linhas sobre `require_audit_reason`, `profiles_guard_*` e CA-09) continua com o texto antigo; a atualização cabe ao `modelagem-dados` (este agente não edita o `02`).
+- O `03-ui-ux.md` é atualizado em paralelo pelo `design-ui-ux` com o mesmo texto do Dashboard.
+- A autenticação em si (autopromoção, nunca zero Administradores ativos, auditoria append-only, só o Administrador exclui comprovante) não foi tocada; os testes correspondentes seguem passando.
+- Pendências herdadas e não tratadas aqui: conferência do `sha256` no servidor (E7), valor fixo antigo da senha local em `docs/legado/07-10/scripts/seed-dev.ts` (depende do responsável).
+- Processos: `next start` e o Chrome do harness foram encerrados; porta 3001 livre. Supabase local rodando com `db reset` e `seed:dev` aplicados.
+
+### Handoff
+
+- **`seguranca`:** revisar as três mudanças de banco do A1 (guardas de `profiles`, `set_user_access` e guard de `proof_files`), em especial que a retirada da exigência de motivo não afrouxou autopromoção, a trava do último Administrador nem a restrição "só o Administrador exclui comprovante".
+- **`qa`:** reexecutar o fluxo de convite até "Sem acesso ativo" em navegador real (A3) e conferir o texto do Dashboard (A2).
+- A FND-001 só fecha com a revisão de `seguranca` e `qa`.
+
+
+---
+
+## E7 · Comprovantes (estrutura, sem tela)
+
+Escopo do plano (seção 8, CA-10, R-D18; modelagem 3.5): utilitário de validação e hash no servidor, route handler de upload, leitura só por URL assinada, harness de integração HTTP. Postura RAT-D020 (nada de camadas extras) e RAT-D021 (motivo opcional; não se aplica ao envio). Sem migration nova: o bucket privado, as políticas e as RPCs vêm da migration `20261023000400_proof_files.sql` (E4).
+
+### Rastreabilidade (requisito -> arquivo -> teste -> resultado)
+
+| Requisito | Arquivo | Teste | Resultado |
+|---|---|---|---|
+| Tamanho: vazio e acima de 4 MiB recusados | `src/server/proofs/proof-file.ts` (`validateProofFile`, `PROOF_MAX_BYTES`) | `proof-file.test.ts` (vazio; 4 MiB + 1; exatamente 4 MiB); e2e: vazio, 4 MiB + 1, 6 MiB, 12 MiB, 4 MiB exato | PASS |
+| Extensão e tipo declarado coerentes com a assinatura binária (PDF, PNG, JPEG); disfarçado recusado | `proof-file.ts` (`detectProofMimeType`, `validateProofFile`) | `proof-file.test.ts` (assinaturas, truncadas, lixo antes do `%PDF-`, 5 combinações de disfarce, extensões e tipos inválidos); e2e: PNG com nome de PDF, HTML com nome de PNG, extensão/tipo divergentes | PASS |
+| SHA-256 calculado no servidor (o cliente não decide) | `proof-file.ts` (`sha256Hex`); `service.ts` repassa só o hash calculado | `proof-file.test.ts` (hash == `node:crypto`); e2e: campo `sha256` falso no formulário é ignorado e o banco guarda o hash real | PASS |
+| Caminho `{aaaa}/{mm}/{proof_file_id}.{ext}`, nunca o nome original | `proof-file.ts` (`buildProofStoragePath`, `isConformingProofStoragePath`); o banco continua definindo o caminho e o servidor confere antes de enviar | `proof-file.test.ts`; `service.test.ts` (caminho fora da convenção barra o envio); e2e: caminho gravado casa com a convenção e não contém o nome | PASS |
+| Route handler de upload; sessão e papel; Sócio, sem papel e inativo recusados | `src/app/api/comprovantes/route.ts`; `src/server/proofs/access.ts` | `access.test.ts`; e2e: Administrador e Operador enviam; Visualizador, Sócio e sem papel 403; sem sessão 401; cookie inválido 401; Operador inativado 403 (envio e leitura) e reativado | PASS |
+| Limite de corpo explícito | `src/server/proofs/body.ts` (`readBodyWithLimit`: Content-Length e contagem dos bytes lidos; 4 MiB + 64 KiB) | `body.test.ts` (Content-Length, chunked e Content-Length mentiroso) | PASS |
+| Duplicado detectado, sem novo objeto | `service.ts` (`storeProofFile`) sobre `register_proof_file` | `service.test.ts`; e2e: mesmo arquivo duas vezes (200, mesmo id, mesma listagem do bucket, uma linha); outro usuário; dois envios simultâneos (uma linha, um objeto) | PASS |
+| Envio ao bucket privado com a sessão do usuário, sem sobrescrita; conclusão do registro | `service.ts` (`upload` com `upsert: false`, depois `complete_proof_file_upload`); a chave secreta não é lida pelo runtime web | `service.test.ts`; e2e: objeto existe no bucket com o nome do banco; novo envio sobre o mesmo caminho é recusado | PASS |
+| Respostas JSON em pt-BR (AppError), sem stack | `src/server/proofs/http.ts` (`jsonOk`, `jsonError`) | e2e: toda recusa tem `{ ok:false, error:{ code, message } }`, texto em português e sem traço de pilha, `node_modules`, `supabase`, `postgres` ou `violates` | PASS |
+| Leitura só por URL assinada de curta duração, com permissão conferida antes | `src/app/api/comprovantes/[id]/url/route.ts`; `service.ts` (`createProofSignedUrl`, 60 s) | `service.test.ts`; e2e: Administrador, Operador e Visualizador recebem a URL e ela entrega o mesmo SHA-256; token com validade menor que 5 min; Sócio e sem papel 403; sem sessão 401; id inexistente ou não UUID 404; endereço público e autenticado do objeto não entregam o arquivo | PASS |
+| `/api` sem sessão responde 401 em JSON (e não redireciona ao login) | `src/lib/route-access.ts` (`isApiPath`), `src/lib/supabase/proxy.ts` | `route-access.test.ts`; e2e (sem sessão) | PASS |
+| Harness de integração HTTP reutilizável, separado de `npm test` | `vitest.e2e.config.mts`, `tests/e2e/support/{env,http,files,access,global-setup}.ts`, `tests/e2e/comprovantes.e2e.test.ts`, script `npm run test:e2e` | 30 testes | PASS |
+
+### Como o upload funciona
+
+1. O handler cria o cliente com a sessão do usuário (cookie), carrega o perfil e **autoriza antes de ler o corpo**.
+2. Lê o corpo com limite (Content-Length e contagem de bytes), interpreta o multipart, valida o arquivo e calcula o SHA-256.
+3. `register_proof_file` (deduplica pelo hash; o banco define o caminho), upload ao bucket `proofs` com `upsert: false`, `complete_proof_file_upload`.
+4. Duplicado já guardado: 200 com `duplicate: true`, sem upload e sem conclusão. Duplicado cujo comprovante foi excluído logicamente: 409. Duplicado ainda pendente: reenvia ao mesmo caminho (retomada de envio interrompido); se o storage nega (pendente de outro usuário), 409; se o objeto já existe, só conclui.
+5. Resposta nova: 201; duplicado: 200.
+
+O limite do Next 16 que motivou o cuidado: com proxy ativo o Next guarda só os primeiros 10 MB do corpo (`proxyClientMaxBodySize`) e **segue sem erro com o corpo cortado**. Por isso o limite é do handler (4 MiB + 64 KiB de folga de multipart), e o tamanho exato do arquivo é conferido depois.
+
+### Mitigação no banco (item 4)
+
+Já existia desde a E4 e não precisou de migration: `private.proof_files_guard_update` só deixa a linha ir a `STORED` se houver em `storage.objects` um objeto de `proofs` com o nome, o tamanho e o tipo registrados (pgTAP em `06_proof_files_storage.test.sql`, e agora também e2e pela API direta: concluir sem objeto ou com tamanho diferente retorna `23514`; sobrescrever o objeto é recusado).
+
+### Risco residual (RAT-D020; não mitigado)
+
+Quem tem papel de Operador (ou Administrador) e chama **direto** a API do Supabase com a própria sessão pode: registrar um `sha256` falso pela RPC e enviar ao bucket um conteúdo qualquer do mesmo tamanho, com `Content-Type` permitido; o banco não vê o conteúdo e não recalcula o hash (R-D18). Consequências: um hash "reservado" que não corresponde ao arquivo (bloqueia o envio legítimo desse hash) e um objeto cujo conteúdo não passou pela checagem de assinatura. Não há ganho de acesso a dados de terceiros nem de papel. Aceito pela postura de uso interno; os dois lados do risco ficam registrados e o e2e tem um teste de caracterização do limite da mitigação (o banco só confere coerência entre linha e objeto). O risco seria reduzido removendo a escrita direta de Operador em `proof_files` e no storage (só o servidor com uma credencial própria), o que contraria a regra de não usar a chave secreta no runtime web. Decisão de produto, não tomada aqui. Também sem antivírus e sem retenção (P-15, P-20).
+
+Proteção contra CSRF: o handler depende do cookie de sessão `SameSite=Lax` (POST de outro site não leva a sessão). Não foi criada verificação adicional de `Origin` (RAT-D020).
+
+### Divergências e decisões desta etapa
+
+- **D-E7-01.** O proxy passou a responder `401` em JSON a qualquer `/api/*` sem sessão, em vez do redirecionamento 307 para `/login`. Necessário para o upload ser uma API, não uma navegação. Só afeta `/api`; as páginas continuam como antes. O handler também recusa por conta própria (defesa em profundidade).
+- **D-E7-02.** Validação estrita: o **tipo declarado é obrigatório** e precisa ser exatamente `application/pdf`, `image/jpeg` ou `image/png` (recusa ausente, `application/octet-stream` e `image/jpg`); o PDF só vale com `%PDF-` no byte 0. Escolha conservadora do desenvolvedor, não vem do plano; fácil de relaxar se o futuro cliente de upload precisar.
+- **D-E7-03.** A leitura é `GET /api/comprovantes/{id}/url`, que devolve JSON com a URL assinada e `expiresInSeconds` (60), e não um redirecionamento 302. Facilita a futura tela e o teste. Quem pode ler: Administrador, Operador e Visualizador (igual a `can_read_business`); comprovante excluído logicamente ou ainda pendente responde 404.
+- **D-E7-04.** `vitest.config.mts` ganhou um alias de `server-only` para um módulo vazio (`tests/stubs/server-only.ts`), para testar `service.ts` sem o bundler do Next. Não afeta o build.
+- **D-E7-05.** Testes pgTAP `02_roles_matrix` e `06_proof_files_storage`: as contagens de leitura positiva (`= 1`) passaram a considerar só as linhas e objetos do próprio teste (`uploaded_by`/`owner_id` com prefixo `f1000000-`). Antes dependiam de `proof_files` e do bucket vazios e falhavam depois de qualquer envio real (apareceu ao rodar o e2e e depois o `db:test`). As contagens "= 0" de quem não pode ler ficaram sem filtro (mais fortes). Nenhuma expectativa de comportamento mudou.
+- **D-E7-06.** O e2e precisa da senha do `seed:dev` (`DEV_SEED_PASSWORD`, do ambiente ou do `.env.local`), porque o seed gera uma senha aleatória quando ela não está definida. Para inativar um usuário o teste usa a CLI do Supabase local (`private.set_user_access` só roda como `postgres`; `profiles` não aceita UPDATE direto de `authenticated`), por isso a CLI precisa estar disponível (como no `seed:dev`) e o usuário é reativado no `finally`. O e2e recusa alvo que não seja local.
+- **D-E7-07.** O e2e deixa comprovantes de teste no banco e no bucket locais (exclusão é só lógica; cada arquivo tem conteúdo único). `npm run db:reset` limpa.
+
+### Verificação (resultados reais, 23/10/2026)
+
+| Comando | Resultado |
+|---|---|
+| `npm run lint` | exit 0, sem avisos |
+| `npm run typecheck` | exit 0 |
+| `npm test` | 20 arquivos, 273 testes (eram 221; +52: proof-file 24, service 14, body 7, access 6, route-access 1) |
+| `npm run build` | exit 0; rotas `/api/comprovantes` e `/api/comprovantes/[id]/url` dinâmicas |
+| `npx supabase db reset` | exit 0 |
+| `npm run db:test` | 6 arquivos, 237 testes, PASS (limpo; depois do `seed:dev`; e com comprovantes do e2e no banco, após o ajuste D-E7-05) |
+| `npm run seed:dev` | exit 0 |
+| `npm run test:e2e` (contra `next start` na 3001) | 1 arquivo, 30 testes, PASS (duas execuções seguidas no mesmo banco) |
+| Log do `next start` | zero eventos `error`, zero avisos de `Date.now()`; só `proof.upload`, `proof.signed_url` e `proof.request_refused` |
+
+Primeira execução do e2e: 27 de 28 passaram; a falha foi do próprio teste (tentava inativar o usuário por UPDATE direto em `profiles`, que `authenticated` não pode). Corrigido com a CLI (D-E7-06).
+
+### Pendências e observações
+
+- O limite de 4 MiB continua **provisório** (P-15). Retenção, antivírus e base legal (P-15, P-20) seguem pendentes.
+- Sem tela de upload e sem leitura automática (OCR, P-16). O Sócio continua sem acesso até a P-02b.
+- O `02-modelagem-dados.md` e o plano não foram editados; nada aqui contradiz o `02`, mas o `02` ainda descreve motivo obrigatório (D-E4-13).
+- SEG-E45-03: o resto fica cumprido no caminho normal (hash e tipo conferidos no servidor); o caminho direto é o risco residual acima. SEG-E45-09 (senha antiga do seed no legado) continua dependendo do responsável.
+- Para a E8/CI: `npm run test:e2e` precisa de Supabase local, `db:reset` + `seed:dev` com `DEV_SEED_PASSWORD` conhecida e `npm run build && npm start`.
+- **Decisão de produto para a futura tela de importação (QA E7/E8, baixo):** um comprovante em `PENDING_UPLOAD` bloqueia o mesmo arquivo (mesmo hash) para os demais usuários, que recebem 409, e não há expiração nem limpeza. Se o Operador que iniciou o envio desistir ou for inativado, ninguém consegue enviar aquele arquivo. Não foi alterado nesta etapa (não há tela de upload e a regra de expiração do pendente não está decidida). Decidir, junto com a tela: prazo de expiração do pendente, limpeza e quem pode liberar.
+
+### Handoff
+
+- **`seguranca`:** revisar `src/server/proofs/*`, os dois route handlers, o 401 de `/api` no proxy e o risco residual do caminho direto; conferir que a chave secreta não é usada no runtime web (o código novo da E7 não lê `SUPABASE_SECRET_KEY`; as menções em `src/lib/env*.ts` são só a trava que a recusa fora do ambiente local).
+- **`qa`:** rodar `npm run test:e2e` em ambiente limpo e testar manualmente um PDF real e uma imagem real (por exemplo com `curl -F file=@arquivo.pdf;type=application/pdf` com o cookie de sessão).
+- A FND-001 só fecha com a revisão de `seguranca` e `qa`.
+
+---
+
+## E8 · Testes, CI e artefatos da E9
+
+Data: 23/10/2026. Escopo: smoke ponta a ponta do CA-08 sem navegador, CI no GitHub Actions, workflow de migrations x deploy, `vercel.json`, bootstrap do primeiro Administrador, checklist da E9 e README. **Sem aprovação declarada:** a revisão de `seguranca` (E8b) e a validação de `qa` seguem pendentes.
+
+### Rastreabilidade (critério -> arquivo -> teste -> resultado)
+
+| Critério | Arquivo(s) | Teste / comando | Resultado |
+|---|---|---|---|
+| CA-08 login, guarda, logout | `tests/e2e/acesso.e2e.test.ts` (grupo "login, guarda de rota e logout"), `tests/e2e/support/pages.ts` | `npm run test:e2e`: sem sessão -> 307 `/login` (com `next`); credenciais erradas e e-mail inexistente com a mesma mensagem; login do Administrador -> 303 `/`; `/login` com sessão volta a `/`; `next` interno respeitado e externo ignorado; logout limpa o cookie e a guarda volta a redirecionar; cookie inválido tratado como sem sessão | 7 testes PASS |
+| CA-08 usuário inativo / sem papel / Sócio | `acesso.e2e.test.ts` (grupo "acesso por situação do usuário"), `support/access.ts` | sem papel e Sócio entram, mas só veem "Sem acesso ativo" / "Acesso de sócio ainda não disponível" em qualquer rota; inativado perde o acesso na hora (sessão antiga e login novo) e recupera ao reativar; Visualizador sem acesso à administração | 4 testes PASS |
+| CA-08 auto-cadastro desligado | `acesso.e2e.test.ts` (grupo "auto-cadastro desligado") | `POST /auth/v1/signup` e `/auth/v1/otp` com `create_user`: 422 `signup_disabled`, sem e-mail no Mailpit; a tela de login não oferece cadastro | 3 testes PASS |
+| CA-08 convite -> `/auth/confirm` -> definir senha -> entrar | `acesso.e2e.test.ts` (grupo "convite..."), `support/admin.ts`, `support/mail.ts` | convite pela API administrativa local; e-mail lido no Mailpit; abrir o link duas vezes não consome o token nem cria sessão; clique -> 303 `/definir-senha?modo=convite`; senha curta e senhas diferentes recusadas; senha definida; reuso do link recusado; login com a senha nova leva a "Sem acesso ativo" | 1 teste PASS |
+| CA-08 recuperação de senha | idem | `/recuperar-senha` -> e-mail -> clique -> nova senha; a antiga deixa de valer; link de uso único; e-mail desconhecido recebe a mesma resposta e nenhum e-mail; `/auth/confirm` com parâmetros inválidos não cria sessão | 3 testes PASS |
+| CA-02 | `.github/workflows/ci.yml` (job `qualidade`) | `npm audit --omit=dev --audit-level=high` | exit 0, 0 vulnerabilidades |
+| CA-03 | `ci.yml` | lint, typecheck, `npm test`, build na ordem da CI | todos exit 0; 279 testes de unidade (eram 273) |
+| CA-12 | `scripts/lib/bundle-secrets.ts`, `scripts/check-bundle-secrets.ts`, `scripts/lib/bundle-secrets.test.ts`, `ci.yml` | `npm run check:bundle` após o build com a chave secreta e o JWT `service_role` no ambiente; 6 testes de unidade do detector; prova negativa com um bundle copiado e a chave plantada (falha com exit 1, sem imprimir o valor) | 35 arquivos de `.next/static` sem segredo; prova negativa PASS |
+| CA-15 (artefatos do agente) | `.github/workflows/migrations.yml`, `vercel.json`, `scripts/sql/bootstrap-first-admin.sql` e `-verify.sql`, `checklist-e9.md` | YAML validado com js-yaml; bootstrap executado no Supabase local: marcadores intactos -> "E-mail inválido"; preenchido -> `PROMOTED`; repetição -> `ALREADY_ADMIN`; conferência mostra 1 Administrador ativo, `BOOTSTRAP_ADMIN` e `UPDATE` com origem `SCRIPT` | PASS local. O workflow e a Vercel **não** puderam ser executados aqui (veja pendências) |
+| CA-17 | `README.md`, `checklist-e9.md`, esta seção | README com testes de integração, CI e publicação | feito; 05, 06 e 07 dependem das revisões |
+
+### O que foi feito
+
+1. **Smoke de acesso sem navegador.** O harness da E7 ganhou `support/pages.ts` (GET, leitura dos formulários do HTML e envio como um navegador sem JavaScript, com os campos ocultos da Server Action e o cabeçalho `Origin`), `support/mail.ts` (Mailpit local) e `support/admin.ts` (convite pela API administrativa do Supabase local). `global-setup.ts` agora confere também o Mailpit e recusa alvo não local. `support/http.ts` ganhou `fetchWithRetry` (D-E8-06).
+2. **CI** (`.github/workflows/ci.yml`): `permissions: contents: read`, `concurrency` que cancela execuções superadas, só `actions/checkout` e `actions/setup-node`, nenhum segredo do repositório. Dois jobs em paralelo: `qualidade` (npm ci, lint, typecheck, unitários, audit) e `integracao` (Supabase local só com os serviços necessários, `db reset`, pgTAP, `db lint --fail-on error`, `db advisors --type security --level warn --fail-on warn`, build, `check:bundle`, seed, `next start`, `test:e2e`, conferência de que o log do servidor não registrou erro).
+3. **Migrations x deploy** (`.github/workflows/migrations.yml`): só `workflow_dispatch`; o job exige `github.actor` e `github.triggering_actor` iguais a `athrios` e a `main`; `supabase link` + `db push --linked` com segredos do GitHub; depois, o deploy hook da Vercel. Opção "Só simular" (`db push --dry-run`). Nunca roda `config push`. Nomes dos segredos documentados no cabeçalho, sem valores.
+4. **`vercel.json`:** região das funções `gru1` e `git.deploymentEnabled.main = false` (a `main` não publica sozinha; Previews continuam).
+5. **Bootstrap do primeiro Administrador:** `scripts/sql/bootstrap-first-admin.sql` (uma instrução, marcadores no lugar do e-mail e do rótulo de quem executa, instruções no cabeçalho) e `bootstrap-first-admin-verify.sql` (conferência somente leitura, sem e-mail).
+6. **Checklist da E9** (`checklist-e9.md`) e **README** (testes de integração, CI, publicação, scripts).
+
+### Divergências e decisões desta etapa
+
+- **D-E8-01 (Playwright -> smoke HTTP).** O plano (seção 11 e etapa E8) previa Playwright; ele não foi aprovado. O CA-08 foi coberto por requisições HTTP reais ao `next start` e ao Supabase local. **O que isso não cobre:** execução de JavaScript e hidratação, cliques reais, layout e acessibilidade no navegador. O estado devolvido por uma Server Action sem JS só aparece no payload RSC (já registrado na E5), e por isso os testes procuram `"status":"..."` no payload. O HTML em streaming traz o campo oculto `next` duas vezes (fallback e definitivo; o navegador descarta o primeiro ao hidratar), então o teste envia o valor definitivo explicitamente. A verificação em navegador real ficou, até aqui, com as provas manuais por CDP das rodadas anteriores (A3).
+- **D-E8-02.** O convite do teste usa a API administrativa do Supabase **local** com a chave secreta local (`E2E_SUPABASE_SECRET_KEY` ou `SUPABASE_SECRET_KEY` do `.env.local`). Só o processo do teste a lê; a aplicação não (a regra de `APP_ENV` continua valendo). Reproduz o que o painel faz no ambiente hospedado.
+- **D-E8-03.** `vitest.config.mts` passou a incluir `scripts/**/*.test.ts` (teste do detector de segredos do CA-12). O `test:e2e` continua fora do `npm test`.
+- **D-E8-04.** Na CI o seed roda com `npx tsx scripts/seed-dev.ts`, porque `npm run seed:dev` passa `--env-file=.env.local` e o arquivo não existe no runner. A senha do seed é aleatória, mascarada nos logs e só existe naquela execução.
+- **D-E8-05.** `supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,postgres-meta,realtime`: confirmado localmente que `db reset`, pgTAP, `db lint`, `db advisors`, Auth, Storage e Mailpit funcionam sem esses serviços.
+- **D-E8-06.** `fetchWithRetry` nos testes de integração: o keep-alive do Next é curto e os testes de usuário inativo ficam segundos parados (chamada da CLI), o que dava `ECONNRESET` na conexão reaproveitada (apareceu na primeira rodada completa, inclusive em um teste da E7). A repetição só ocorre nesse erro, que acontece antes de o servidor receber o pedido.
+- **D-E8-07 (a confirmar no primeiro deploy).** `git.deploymentEnabled.main = false` e o deploy hook de Production **não puderam ser verificados** contra a documentação atual da Vercel nem contra uma conta (sem acesso daqui). O plano citava "Ignored Build Step" e hook ou `vercel deploy --prod`; foi adotado o ajuste do `vercel.json` mais o hook. Também a aceitação da região `gru1` pelo plano da Vercel. O que confirmar está no `checklist-e9.md`, passo 5.
+- **D-E8-08.** O workflow de migrations exige também `github.triggering_actor == 'athrios'` (uma reexecução por outro usuário mantém o `actor` original) e `ref == main`, além do que o plano pedia; e tem a opção "Só simular". Não roda `supabase config push` de propósito: o `config.toml` é do ambiente local e sobrescreveria o Auth hospedado.
+- **D-E8-09.** O contrato do bootstrap em `02-modelagem-dados.md`, seção 6.1, mostra `begin; select ...; commit;`. O script versionado tem só o `select`: a função já é atômica, a CLI aceita uma instrução por arquivo e o editor SQL do painel dispensa a transação explícita. O motivo da auditoria continua fixo na função ("Bootstrap do primeiro Administrador"), pois ela não recebe motivo; é informado, não exigido (RAT-D021). O `02` não foi editado.
+- **D-E8-10.** O gate de `db advisors` usa `--level warn --fail-on warn`. A falha do gate foi provada em nível `info` (o advisor `unindexed_foreign_keys` de `proof_files` aparece e `--fail-on info` sai com 1); em `warn` não foi possível provocar um achado (a tentativa com várias instruções num único `db query` foi recusada pela CLI, que só aceita uma por arquivo). Em `warn` o banco atual está limpo.
+- **D-E8-11.** A execução local usou o `.env.local` da máquina, então o `next start` local também enxergava `SUPABASE_SECRET_KEY` (permitido com `APP_ENV=local`). Na CI não há `.env.local`: o servidor sobe só com as variáveis públicas e `APP_ENV=local`.
+- Nenhum comando git de escrita foi executado. O Brain, o plano e o `CLAUDE.md` não foram editados.
+
+### Verificação (resultados reais, 23/10/2026; ordem da CI)
+
+| Passo | Resultado |
+|---|---|
+| `npm run lint` | exit 0, sem avisos |
+| `npm run typecheck` | exit 0 |
+| `npm test` | 21 arquivos, 279 testes PASS (sem Supabase nem servidor) |
+| `npm audit --omit=dev --audit-level=high` | exit 0, 0 vulnerabilidades |
+| `supabase start -x ...` (serviços reduzidos) | exit 0, cerca de 1 min com imagens já baixadas |
+| `supabase db reset` | exit 0 |
+| `supabase test db` (pgTAP) | 6 arquivos, 237 testes PASS (limpo e de novo depois do e2e, com dados de teste no banco) |
+| `supabase db lint --fail-on error` | exit 0, sem erros |
+| `supabase db advisors --local --type security --level warn --fail-on warn` | exit 0, sem achados |
+| `npm run build` | exit 0 |
+| `npm run check:bundle` | exit 0, 35 arquivos sem segredo; prova negativa com a chave e o JWT `service_role` plantados: exit 1 |
+| seed (`tsx scripts/seed-dev.ts`) | exit 0, cinco usuários fictícios |
+| `next start` + `npm run test:e2e` | 2 arquivos, 48 testes (30 de comprovantes + 18 de acesso) PASS em duas execuções seguidas no mesmo banco |
+| log do `next start` | 0 eventos de erro e 0 avisos de `Date.now()`; só `auth.*` e `proof.*` informativos ou de aviso |
+| bootstrap SQL no Supabase local | marcadores intactos: erro "E-mail inválido"; preenchido: `PROMOTED`; repetição: `ALREADY_ADMIN`; conferência coerente |
+| validação sintática dos workflows | `js-yaml` carregou `ci.yml` e `migrations.yml` sem erro |
+
+Estado final deixado: porta 3001 livre; Supabase local rodando com `db reset` + `seed:dev` aplicados.
+
+### Gate G3 (encerramento da implementação)
+
+Etapas E0 a E8 implementadas e registradas neste documento (E0 e E2 a E6 na `main`; E7 e E8 na branch atual, sem commit). Todos os comandos da sequência da CI passaram localmente. **O G3 não está aprovado por mim:** faltam a execução real da CI no GitHub, a revisão de `seguranca` (E8b) e a validação de `qa`.
+
+### Pendências e observações
+
+- **A CI não rodou no GitHub.** Não é possível executar o Actions daqui. Foram testados localmente os mesmos comandos, na mesma ordem; o que só aparece lá: tempo real do runner, download das imagens do Supabase, versões `@v4` das duas actions oficiais (não verificadas contra as versões atuais), e o passo que exporta as chaves do `supabase status`. Na primeira execução, olhar esses pontos.
+- **`migrations.yml`, `vercel.json` e o deploy hook:** não executados (exigem Supabase hospedado, Vercel e segredos). Confirmar no primeiro deploy (D-E8-07) e na E9b.
+- **Segurança (E8b) deve olhar:** os dois workflows (condição de ator, segredos, ausência de eco), o script de bootstrap, o `check:bundle` (cobre `.next/static`; não cobre o que o servidor devolve em respostas), o harness que usa a chave secreta **local**, e o risco residual de comprovantes da E7.
+- **QA deve:** rodar a sequência da CI em ambiente limpo, repetir o e2e, e exercer em navegador real o que o smoke HTTP não cobre (D-E8-01).
+- `02-modelagem-dados.md` ainda descreve motivo obrigatório (D-E4-13) e o bootstrap com `begin/commit` (D-E8-09): atualização pelo `modelagem-dados`.
+- Mantidas as pendências anteriores: SEG-E45-09 (senha antiga no legado) depende do responsável; P-25, P-24 e P-05c2 afetam a E9 (listadas no checklist).
+- Para reexecutar o e2e agora: o Supabase local foi seedado com uma senha local aleatória gerada nesta rodada (veja a entrega); para outra, rode `db reset` e o seed com a nova `DEV_SEED_PASSWORD`.
+
+### Handoff
+
+Solicitar revisão de `seguranca` (E8b: workflows, bootstrap, checklist e `check:bundle`) e de `qa` (sequência da CI em ambiente limpo e verificação em navegador). Depois delas, o responsável executa a E9 pelo `checklist-e9.md`. O `relator` só entra depois da E10.
+
+## Ajustes pós-validação (E7/E8)
+
+| Campo | Valor |
+|---|---|
+| Data | 23/10/2026 |
+| Agente | `desenvolvedor` |
+| Plano | `01-plano.md` (revisão 9) |
+| Base | Achados baixos de `05-seguranca.md` (E8b) e `06-qa.md` (E7 e E8) |
+| Status | Implementado e verificado localmente. **Sem aprovação declarada**: depende da revisão de `seguranca` e `qa` |
+
+### Itens
+
+| Item | Origem | O que foi feito | Arquivo |
+|---|---|---|---|
+| B1 | SEG-E8B-05 | O passo 3 do checklist deixou de sugerir o curinga `https://*-<slug>.vercel.app/auth/confirm` (casaria com projetos de outras contas da Vercel cujo nome termine igual). Agora: só o endereço de Production + `/auth/confirm` e, se precisar testar o Preview, a URL fixa de branch dele (`<projeto>-git-<branch>-<slug>.vercel.app/auth/confirm`). O README não repetia o curinga. | `docs/features/FND-001-fundacao/checklist-e9.md` |
+| B2 | QA B-01 | **Causa:** a página `/auth/confirm` declarava `referrer: "no-referrer"`. Com essa política o navegador envia `Origin: null` no envio de um formulário (navegação), e o Next recusa a Server Action ("Invalid Server Actions request", 500). Isso acontece ao clicar antes da hidratação ou sem JavaScript; depois de hidratada, a ação sai por `fetch` (modo cors), que manda o `Origin` correto, por isso o fluxo normal funcionava. O smoke HTTP não via o problema porque monta o `Origin` à mão. **Correção:** `referrer: "strict-origin"` (no máximo o domínio, nunca o caminho com o token; o `Origin` fica correto). Sem botão desabilitado e sem mudança de fluxo. Teste de unidade fixa o valor. | `src/app/(auth-flow)/auth/confirm/page.tsx`, `page.test.ts` |
+| B3 | QA (código morto) | Removidos o aviso `senha-definida` e o mapa `NOTICES` de `/login`; restou só `sessao-expirada`. Nada mais referenciava o aviso. | `src/app/(public)/login/page.tsx` |
+| B4 | QA (baixo) | Registrada a decisão de produto sobre `PENDING_UPLOAD` bloqueando o mesmo hash (409, sem expiração) nas pendências da E7. Sem mudança de código. | seção "E7 · Comprovantes" deste arquivo |
+
+### Comprovação do B2 (Chrome headless por CDP, perfil temporário próprio, `next start` na 3001)
+
+Convite gerado pela API de administração do Auth local; um token por cenário; clique no botão "Aceitar convite" de `/auth/confirm`.
+
+| Cenário | Antes da correção | Depois da correção |
+|---|---|---|
+| JavaScript desativado | 500 "Internal Server Error"; log "Origin null ... Aborting the action" | 303 para `/definir-senha?modo=convite` (token consumido, página renderizada) |
+| JavaScript permitido, chunks do Next bloqueados (clique sem hidratação) | 500 "Internal Server Error" | `/definir-senha?modo=convite` |
+| Página hidratada | `/definir-senha?modo=convite` | `/definir-senha?modo=convite` |
+
+O log do `next start` depois da correção não tem erros.
+
+### Verificação (resultados reais, 23/10/2026)
+
+| Comando | Resultado |
+|---|---|
+| `npm run lint` | sem erros |
+| `npm run typecheck` | sem erros |
+| `npm test` | 22 arquivos, 281 testes passando (2 novos, de `page.test.ts`) |
+| `npm run build` | sucesso |
+| `npx supabase db reset` | sucesso |
+| `npm run db:test` | 6 arquivos, 237 testes, PASS |
+| `npm run seed:dev` (`DEV_SEED_PASSWORD` só no shell) | sucesso |
+| `npm start` (3001) + `npm run test:e2e` | 2 arquivos, 48 testes passando; log do servidor sem erros |
+
+O cenário de CDP foi executado antes do `db reset` final; os usuários de teste que ele criou foram removidos pelo reset.
+
+### Divergências e pendências
+
+- Nenhuma divergência nova em relação ao plano nem ao `03-ui-ux.md` (nenhum dos dois cita a política de referrer). A política da página passou de `no-referrer` (E5) para `strict-origin`; a intenção (token fora do Referer) permanece.
+- O smoke HTTP (D-E8-01) continua sem cobrir clique real: a regressão do B2 só é pega por navegador ou pelo teste de unidade do metadata.
+- Pendências anteriores mantidas (SEG-E45-09 depende do responsável; `02-modelagem-dados.md` desatualizado quanto a D-E4-13 e D-E8-09).
+
+### Handoff
+
+Solicitar revisão de `seguranca` (B1, e a troca de `no-referrer` por `strict-origin` no B2) e de `qa` (repetir o clique antes da hidratação em navegador real).

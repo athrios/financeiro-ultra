@@ -8,8 +8,8 @@
  *         com a chave secreta local. O trigger do Auth cria os perfis SEM papel.
  * Fase 2: atribui os papéis executando scripts/sql/seed-dev-access.sql com
  *         `supabase db query --local -f` (conexão como postgres, que é o único papel
- *         com EXECUTE em private.set_user_access). Cada atribuição exige motivo e
- *         fica na auditoria (origem SCRIPT, rótulo 'seed-dev').
+ *         com EXECUTE em private.set_user_access). Cada atribuição fica auditada (origem SCRIPT,
+ *         rótulo 'seed-dev'); o motivo é opcional (RAT-D021) e aqui vai informado.
  *
  * Recusa qualquer alvo que não seja o Supabase local: a URL precisa ser 127.0.0.1 ou
  * localhost, e o comando da CLI fixa --local (nunca --linked nem --db-url).
@@ -132,7 +132,7 @@ async function main(): Promise<void> {
     await ensureUser(email, fullName);
   }
 
-  console.log("Fase 2: papéis (private.set_user_access, como postgres, com motivo)");
+  console.log("Fase 2: papéis (private.set_user_access, como postgres, auditado)");
   assignRoles();
 
   console.log("Verificação pelo RLS (cada usuário lê o próprio perfil e os sócios):");
