@@ -18,7 +18,7 @@ A fonte de verdade funcional está em `brain-mensalidades-rateio/`.
 
 ## Feature em andamento
 
-FND-001 (Fundação): `docs/features/FND-001-fundacao/`. O plano aprovado é `01-plano.md` (revisão 10); o registro de implementação é `04-implementacao.md`. Não edite o plano nem o Brain sem pedido explícito do responsável.
+FND-001 (Fundação): `docs/features/FND-001-fundacao/`. O plano aprovado é `01-plano.md` (revisão 11); o registro de implementação é `04-implementacao.md`. Não edite o plano nem o Brain sem pedido explícito do responsável.
 
 ## Decisões vigentes que afetam o código (resumo)
 

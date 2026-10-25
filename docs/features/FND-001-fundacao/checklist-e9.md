@@ -12,6 +12,31 @@ Antes de começar, tenha à mão: o repositório `athrios/financeiro-ultra` (pri
 | **P-24** | Gestão de usuários pelo painel do Supabase ou pela aplicação | Na FND: **painel**. Por isso nenhuma chave secreta vai para a Vercel (passo 4) |
 | **P-05c2** | Banco de homologação separado e planos pagos | Antes de **dados reais**. Enquanto o banco for único, só dados fictícios; Preview e Production usam o mesmo projeto Supabase. Vercel Hobby é para uso não comercial e Supabase Free não tem backup automático |
 
+## Ordem com a opção B (sem GitHub Actions)
+
+Decisão de 24/10/2026 (plano, revisão 11): o GitHub Actions está bloqueado pela cobrança da conta. Por isso a CI e o workflow de migrations não rodam por enquanto, e você mesmo aplica a linha de base pelo CLI, a partir da pasta do projeto. Siga esta ordem; os passos citados estão detalhados mais abaixo.
+
+1. **Passo 1:** criar o projeto Supabase.
+2. **Logo em seguida, parte do passo 3:** desligar o auto-cadastro, senha mínima 10 e `secure_password_change`.
+3. **Migrations pelo CLI** (substituem os passos 2 e 6 por enquanto). No terminal, na pasta do projeto:
+   ```bash
+   npx supabase login
+   npx supabase link --project-ref <REF-DO-PROJETO>
+   npx supabase db push --dry-run
+   npx supabase db push
+   ```
+   - O `login` abre o navegador. O `link` pede a senha do banco: digite você, sem colar em arquivo.
+   - O `--dry-run` deve listar só as 5 migrations da linha de base, de `20261023000100_base.sql` a `20261023000500_privileges.sql`.
+   - **Não use** `--include-seed` (o seed é só do ambiente local) nem `supabase config push`.
+   - Conferência, só leitura: `npx supabase migration list --linked` (as 5 aparecem como aplicadas no remoto) e `npx supabase db advisors --linked --type security --level warn` (sem achados).
+4. **Passo 4:** importar na Vercel, com as variáveis.
+5. **Resto do passo 3:** Site URL e Redirect URLs com o endereço de Production da Vercel, modelos de e-mail e SMTP (P-25).
+6. **Passo 5:** criar o deploy hook e publicar Production chamando o hook no terminal: `curl.exe -X POST "<URL-DO-HOOK>"` (no PowerShell, use `curl.exe`; no Git Bash, `curl`). A URL é segredo: não a cole em arquivo.
+7. **Passos 7, 8 e 9:** convite e primeiro Administrador, smoke e cadastro recusado.
+8. **Passos 2 e 6:** ficam para quando a cobrança do GitHub for resolvida, para as próximas migrations.
+
+Evidência extra para a E9b: a saída do `migration list --linked` e do `db advisors --linked`.
+
 ## 1. Projeto Supabase
 
 1. Criar o projeto no Supabase, região **São Paulo (`sa-east-1`)**. Não muda depois.
@@ -115,7 +140,7 @@ Evidência: uma linha por item (feito/não feito) e as URLs usadas.
 
 ## 9. Cadastro público recusado (CA-15)
 
-Com a chave publicável do projeto hospedado, tentar criar uma conta pela API de Auth (exemplo no terminal; troque os dois marcadores):
+Com a chave publicável do projeto hospedado, tentar criar uma conta pela API de Auth (exemplo para o Git Bash; no PowerShell, junte tudo numa linha só e use `curl.exe`; troque os dois marcadores):
 
 ```bash
 curl -s -X POST "<URL-DO-PROJETO>/auth/v1/signup" \
