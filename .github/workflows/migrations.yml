@@ -4,14 +4,14 @@ name: Migrations e publicação em Production
 # banco hospedado e de publicar Production:
 #   1. só é disparado à mão (workflow_dispatch), pelo responsável, na aba Actions;
 #   2. o job só roda se quem disparou for o usuário do responsável e se a execução for da `main`;
-#   3. aplica as migrations (`supabase db push`) e SÓ DEPOIS pede o deploy de Production à Vercel,
-#      por deploy hook. A Production não publica sozinha (veja vercel.json).
+#   3. aplica as migrations (`supabase db push`) e SÓ DEPOIS pede o deploy de Production ao Render,
+#      por deploy hook. A Production não publica sozinha (render.yaml: autoDeployTrigger 'off').
 #
 # Segredos do repositório (Settings > Secrets and variables > Actions; nomes, nunca valores aqui):
 #   SUPABASE_ACCESS_TOKEN     token de acesso pessoal do Supabase, com o menor escopo possível
 #   SUPABASE_PROJECT_REF      identificador (ref) do projeto Supabase de São Paulo
 #   SUPABASE_DB_PASSWORD      senha do banco do projeto
-#   VERCEL_DEPLOY_HOOK_URL    URL do deploy hook da Vercel (branch main -> Production)
+#   RENDER_DEPLOY_HOOK_URL    URL do deploy hook do Render (serviço financeiro-ultra, branch main)
 #
 # Este workflow nunca roda `supabase config push`: o config.toml versionado serve ao ambiente
 # local (site_url e redirect URLs de 127.0.0.1) e SOBRESCREVERIA a configuração do Auth hospedado.
@@ -73,20 +73,19 @@ jobs:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
 
       # Só chega aqui se as migrations foram aplicadas sem erro (cada passo falha o job).
-      - name: Publicar Production na Vercel (deploy hook)
+      - name: Publicar Production no Render (deploy hook)
         if: ${{ !inputs.somente_simular }}
         shell: bash
         run: |
-          if [ -z "$VERCEL_DEPLOY_HOOK_URL" ]; then
-            echo "Segredo VERCEL_DEPLOY_HOOK_URL ausente. As migrations foram aplicadas; publique a Production manualmente depois de resolver." >&2
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "Segredo RENDER_DEPLOY_HOOK_URL ausente. As migrations foram aplicadas; publique a Production manualmente depois de resolver." >&2
             exit 1
           fi
-          # A URL é segredo: sem -v, sem eco. Mostra só o código HTTP e a resposta curta da Vercel.
+          # A URL é segredo: sem -v, sem eco. Mostra só a resposta curta do Render.
           status=0
-          curl --silent --show-error --fail-with-body --max-time 30 -X POST "$VERCEL_DEPLOY_HOOK_URL" \
-            --output "$RUNNER_TEMP/hook.out" || status=$?
-          head -c 400 "$RUNNER_TEMP/hook.out" || true
+          curl -fsS --max-time 30 -X POST "$RENDER_DEPLOY_HOOK_URL"             --output "$RUNNER_TEMP/hook.out" || status=$?
+          head -c 400 "$RUNNER_TEMP/hook.out" 2>/dev/null || true
           echo
           exit $status
         env:
-          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}

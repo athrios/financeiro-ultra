@@ -158,6 +158,8 @@ O uso do Supabase Storage para os comprovantes é proposta técnica do plano FND
 
 Origem: responsável pelo produto, 22/10/2026 (FND-001, P-05b), e especificação de 07/10/2026.
 
+> **Revisada (25/11/2026)** por [[#RAT-D022 — Hospedagem no Render]]: a aplicação passa a ser hospedada no Render. A stack e o banco no Supabase continuam.
+
 ---
 
 ## RAT-D017 — Vocabulário do sistema
@@ -190,9 +192,9 @@ Origem: responsável pelo produto, 22/10/2026 ("Nomes fictícios para teste").
 
 O sistema **não será público**: será usado internamente, pela equipe e pelos sócios, e não precisa de muitas camadas de segurança.
 
-Fica o básico, que é a base do sistema: login só por convite, papéis garantidos no banco ([[#RAT-D011 — Perfis de acesso]]), auditoria ([[#RAT-D009 — Auditoria obrigatória]]), comprovantes em área privada e segredos fora do código. Mesmo com uso interno, a hospedagem na Vercel ([[#RAT-D016 — Hospedagem e stack]]) deixa o endereço acessível pela internet. Por isso o login e as permissões continuam sendo a barreira.
+Fica o básico, que é a base do sistema: login só por convite, papéis garantidos no banco ([[#RAT-D011 — Perfis de acesso]]), auditoria ([[#RAT-D009 — Auditoria obrigatória]]), comprovantes em área privada e segredos fora do código. Mesmo com uso interno, a hospedagem ([[#RAT-D022 — Hospedagem no Render]]; antes, a Vercel da [[#RAT-D016 — Hospedagem e stack]]) deixa o endereço acessível pela internet. Por isso o login e as permissões continuam sendo a barreira.
 
-Ficam fora, salvo nova decisão: CAPTCHA e limite próprio de tentativas de login, política de conteúdo do navegador (CSP) mais rígida, proteção contra descobrir se um e-mail tem conta, e-mails de aviso (como o de senha alterada) e outras camadas extras. A revisão de segurança antes de publicar (E8b do plano FND-001) passa a ser uma conferência curta da configuração da Vercel e do Supabase.
+Ficam fora, salvo nova decisão: CAPTCHA e limite próprio de tentativas de login, política de conteúdo do navegador (CSP) mais rígida, proteção contra descobrir se um e-mail tem conta, e-mails de aviso (como o de senha alterada) e outras camadas extras. A revisão de segurança antes de publicar (E8b do plano FND-001) passa a ser uma conferência curta da configuração da hospedagem e do Supabase.
 
 Origem: responsável pelo produto, 23/10/2026 (FND-001): "o sistema não será público, será usado internamente, não precisa de muitas camadas de segurança". A divisão entre o que fica e o que sai foi proposta pelo orquestrador na mesma data e apresentada ao responsável.
 
@@ -208,12 +210,25 @@ Origem: responsável pelo produto, 23/10/2026 (FND-001): "motivo não precisa de
 
 ---
 
+## RAT-D022 — Hospedagem no Render
+
+A aplicação será hospedada no **Render**, como serviço web, no lugar da Vercel. Revisa [[#RAT-D016 — Hospedagem e stack]] só quanto à hospedagem: a stack e o banco no Supabase em São Paulo ([[#RAT-D018 — Região do banco]]) continuam.
+
+- O Render não tem região na América do Sul. O serviço fica em **Virginia (EUA)**, a região disponível mais próxima do banco. Consequência: cada consulta ao banco percorre essa distância.
+- A configuração do serviço fica no próprio repositório (arquivo `render.yaml`).
+- A publicação em produção é **manual**, feita pelo responsável.
+
+Origem: responsável pelo produto, 24/11/2026 (FND-001, E9): "mudei de provedor... vou usar o render". Em 25/11/2026 o responsável escolheu a configuração pelo arquivo `render.yaml`. A região Virginia e a publicação manual foram propostas pelo orquestrador no plano da E9 e aprovadas pelo responsável na mesma data.
+
+---
+
 ## Decisões pendentes
 
 - **P-02b** — Escopo de acesso dos sócios com login próprio ([[#RAT-D011 — Perfis de acesso]]).
-- **P-05c2** — Banco separado para homologação e planos pagos (Vercel e Supabase) antes de entrarem dados reais.
+- **P-05c2** — Banco separado para homologação e planos pagos (hospedagem e Supabase) antes de entrarem dados reais.
 - **P-24** — Gestão de usuários pela aplicação (exige a chave secreta no servidor) ou pelo painel do Supabase?
 - **P-25** — Provedor de SMTP para os e-mails de convite e de recuperação de senha, e domínio da aplicação.
+- **P-26** — Com a aplicação no Render em Virginia (EUA) ([[#RAT-D022 — Hospedagem no Render]]), os dados pessoais passam por servidor fora do Brasil, embora o banco fique em São Paulo. Avaliar a LGPD (transferência internacional) antes de entrarem dados reais.
 - **P-08** — Recebedor será sempre uma Parte ou poderá existir recebedor intermediário?
 - **P-10** — Um cliente poderá ter mais de uma mensalidade na mesma competência?
 - **P-09** — Será permitido recebimento parcial?

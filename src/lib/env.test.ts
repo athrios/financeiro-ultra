@@ -150,6 +150,64 @@ describe("APP_ENV explícita na hospedagem (SEG-E45-06)", () => {
   it("aceita APP_ENV explícita na Vercel", () => {
     expect(parseServerEnv({ ...base, VERCEL: "1", VERCEL_ENV: "production", APP_ENV: "production" }).appEnv).toBe("production");
     expect(parseServerEnv({ ...base, VERCEL: "1", VERCEL_ENV: "preview", APP_ENV: "staging" }).appEnv).toBe("staging");
-    expect(() => assertDeployEnv({ VERCEL: "1", VERCEL_ENV: "preview", APP_ENV: "staging" })).not.toThrow();
+    expect(() => assertDeployEnv({ ...base, VERCEL: "1", VERCEL_ENV: "preview", APP_ENV: "staging" })).not.toThrow();
+  });
+
+  describe("Render (RENDER definida)", () => {
+    it("exige APP_ENV", () => {
+      expect(issuesOf(() => parseServerEnv({ ...base, RENDER: "true" })).join("\n")).toContain("APP_ENV");
+      expect(issuesOf(() => parseServerEnv({ ...base, RENDER: "true", APP_ENV: "" })).join("\n")).toContain("APP_ENV");
+      expect(issuesOf(() => assertDeployEnv({ ...base, RENDER: "true" })).join("\n")).toContain("APP_ENV");
+    });
+
+    it("recusa APP_ENV=local, sem depender de VERCEL_ENV", () => {
+      const issues = issuesOf(() => parseServerEnv({ ...base, RENDER: "true", APP_ENV: "local" }));
+      expect(issues.join("\n")).toContain("local");
+      expect(() => assertDeployEnv({ ...base, RENDER: "true", APP_ENV: "local" })).toThrow(EnvError);
+    });
+
+    it("aceita production e staging", () => {
+      expect(parseServerEnv({ ...base, RENDER: "true", APP_ENV: "production" }).appEnv).toBe("production");
+      expect(parseServerEnv({ ...base, RENDER: "true", APP_ENV: "staging" }).appEnv).toBe("staging");
+      expect(() => assertDeployEnv({ ...base, RENDER: "true", APP_ENV: "production" })).not.toThrow();
+      expect(() => assertDeployEnv({ ...base, RENDER: "true", APP_ENV: "staging" })).not.toThrow();
+    });
+  });
+
+  describe("assertDeployEnv valida as variáveis públicas na hospedagem", () => {
+    it("lista as duas variáveis públicas ausentes, sem valores", () => {
+      for (const host of [{ RENDER: "true" }, { VERCEL: "1" }]) {
+        const message = issuesOf(() => assertDeployEnv({ ...host, APP_ENV: "production" })).join("\n");
+        expect(message).toContain("NEXT_PUBLIC_SUPABASE_URL");
+        expect(message).toContain("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
+      }
+    });
+
+    it("junta APP_ENV ausente e variáveis públicas ausentes numa só falha", () => {
+      const issues = issuesOf(() => assertDeployEnv({ RENDER: "true" }));
+      expect(issues).toHaveLength(3);
+    });
+
+    it("recusa chave secreta no lugar da publishable", () => {
+      const issues = issuesOf(() =>
+        assertDeployEnv({ RENDER: "true", APP_ENV: "production", NEXT_PUBLIC_SUPABASE_URL: URL_OK, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_secret_xyz" }),
+      );
+      expect(issues.join("\n")).toContain("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
+      expect(issues.join("\n")).not.toContain("sb_secret_xyz");
+    });
+
+    it("passa com as variáveis públicas e APP_ENV", () => {
+      expect(() => assertDeployEnv({ ...base, RENDER: "true", APP_ENV: "production" })).not.toThrow();
+    });
+
+    it("fora da hospedagem não valida as públicas (build local e CI)", () => {
+      expect(() => assertDeployEnv({})).not.toThrow();
+      expect(() => assertDeployEnv({ NODE_ENV: "production", APP_ENV: "local" })).not.toThrow();
+    });
+
+    it("parseServerEnv não duplica as mensagens das variáveis públicas", () => {
+      const issues = issuesOf(() => parseServerEnv({ RENDER: "true", APP_ENV: "production" }));
+      expect(issues.filter((issue) => issue.startsWith("NEXT_PUBLIC_SUPABASE_URL"))).toHaveLength(1);
+    });
   });
 });

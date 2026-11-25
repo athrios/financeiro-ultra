@@ -18,7 +18,7 @@ A fonte de verdade funcional está em `brain-mensalidades-rateio/`.
 
 ## Feature em andamento
 
-FND-001 (Fundação): `docs/features/FND-001-fundacao/`. O plano aprovado é `01-plano.md` (revisão 11); o registro de implementação é `04-implementacao.md`. Não edite o plano nem o Brain sem pedido explícito do responsável.
+FND-001 (Fundação): `docs/features/FND-001-fundacao/`. O plano aprovado é `01-plano.md` (revisão 12); o registro de implementação é `04-implementacao.md`. Não edite o plano nem o Brain sem pedido explícito do responsável.
 
 ## Decisões vigentes que afetam o código (resumo)
 
@@ -29,6 +29,8 @@ FND-001 (Fundação): `docs/features/FND-001-fundacao/`. O plano aprovado é `01
 - O código antigo fica como referência; nada é removido sem aprovação (RAT-D012).
 - Sistema de uso interno (RAT-D020): fica o básico de segurança (login só por convite, papéis garantidos no banco, auditoria, comprovantes em área privada, segredos fora do código). Não acrescente camadas extras (CAPTCHA, limite próprio de tentativas, CSP mais rígida, e-mails de aviso) sem pedido do responsável.
 - Motivo opcional nas ações auditadas (RAT-D021): grave o motivo quando informado e não bloqueie a ação sem ele. A auditoria em si continua obrigatória (RAT-D009).
+- Hospedagem no **Render** (RAT-D022), configurada pelo `render.yaml`, região Virginia, publicação manual pelo responsável. O `vercel.json` ficou só como referência.
+- O repositório `athrios/financeiro-ultra` é **público** por decisão do responsável: nenhum segredo, ref do projeto Supabase, URL do serviço ou e-mail real em arquivo versionado. Use marcadores (`<URL-DO-PROJETO>`, `<serviço>`).
 - Pasta `.acessos/` contém credenciais pessoais: não leia, não edite, não versione.
 
 ## Subagentes especializados

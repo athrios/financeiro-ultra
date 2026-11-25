@@ -3,7 +3,8 @@ import type { NextConfig } from "next";
 import { assertDeployEnv } from "./src/lib/env";
 import { buildSecurityHeaders } from "./src/lib/security-headers";
 
-// Na Vercel, APP_ENV precisa ser explícita (falha rápida no build e na subida; SEG-E45-06).
+// Na hospedagem (Vercel ou Render), APP_ENV e as variáveis públicas do Supabase precisam estar
+// definidas (falha rápida no início do build e na subida; SEG-E45-06).
 assertDeployEnv(process.env);
 
 const nextConfig: NextConfig = {

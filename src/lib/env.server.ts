@@ -15,6 +15,7 @@ export function getServerEnv(): ServerEnv {
     APP_ENV: process.env.APP_ENV,
     VERCEL: process.env.VERCEL,
     VERCEL_ENV: process.env.VERCEL_ENV,
+    RENDER: process.env.RENDER,
     LOG_LEVEL: process.env.LOG_LEVEL,
     // Lida apenas para verificar que NÃO está presente fora do ambiente local. Nunca é usada.
     SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY,

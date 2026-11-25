@@ -126,29 +126,46 @@ export function parsePublicEnv(source: EnvSource): PublicEnv {
 
 const isSet = (value: string | undefined) => value !== undefined && value.trim() !== "";
 
+/** Hospedagem = Vercel (VERCEL/VERCEL_ENV) ou Render (RENDER). Fora dela (build local e CI) nada muda. */
+function isHosted(source: EnvSource): boolean {
+  return isSet(source.VERCEL) || isSet(source.VERCEL_ENV) || isSet(source.RENDER);
+}
+
 /**
  * APP_ENV tem padrão "local" para o desenvolvimento, mas esse padrão falharia aberto numa
- * hospedagem (sem HSTS, aceitando a chave secreta). Na Vercel (VERCEL ou VERCEL_ENV presentes) a
- * variável precisa ser explícita, e "local" é recusado em produção (SEG-E45-06).
- * Fora da Vercel (npm run build / next start locais) nada muda.
+ * hospedagem (sem HSTS, aceitando a chave secreta). Na Vercel (VERCEL ou VERCEL_ENV) ou no Render
+ * (RENDER) a variável precisa ser explícita. "local" é recusado com VERCEL_ENV=production e sempre
+ * no Render, que não distingue ambientes por variável (SEG-E45-06).
+ * Fora da hospedagem (npm run build / next start locais e CI) nada muda.
  */
 export function deployEnvIssues(source: EnvSource): string[] {
-  if (!isSet(source.VERCEL) && !isSet(source.VERCEL_ENV)) return [];
+  if (!isHosted(source)) return [];
   const appEnv = source.APP_ENV?.trim();
   if (!isSet(appEnv)) {
     return [
-      "APP_ENV: obrigatória quando a aplicação roda na Vercel (VERCEL/VERCEL_ENV); defina staging ou production",
+      "APP_ENV: obrigatória quando a aplicação roda na Vercel ou no Render (VERCEL/VERCEL_ENV/RENDER); defina staging ou production",
     ];
   }
-  if (appEnv === "local" && source.VERCEL_ENV?.trim() === "production") {
-    return ["APP_ENV: o valor 'local' não é permitido com VERCEL_ENV=production"];
+  if (appEnv === "local") {
+    if (isSet(source.RENDER)) return ["APP_ENV: o valor 'local' não é permitido no Render (RENDER)"];
+    if (source.VERCEL_ENV?.trim() === "production") {
+      return ["APP_ENV: o valor 'local' não é permitido com VERCEL_ENV=production"];
+    }
   }
   return [];
 }
 
-/** Falha rápida (next.config.ts) quando a hospedagem está sem APP_ENV explícita. */
+/**
+ * Falha rápida (next.config.ts) quando a hospedagem está sem APP_ENV explícita ou sem as
+ * variáveis públicas do Supabase (que o Next fixa no build). O build falha no início, listando o
+ * que falta, em vez de quebrar no meio da pré-renderização. Fora da hospedagem não valida nada.
+ */
 export function assertDeployEnv(source: EnvSource): void {
   const issues = deployEnvIssues(source);
+  if (isHosted(source)) {
+    const publicResult = publicSchema.safeParse(source);
+    if (!publicResult.success) issues.push(...collectIssues(publicResult.error));
+  }
   if (issues.length > 0) throw new EnvError(issues);
 }
 

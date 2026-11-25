@@ -253,3 +253,138 @@ Em 23/10/2026 o responsável decidiu que o sistema é de uso interno e não prec
 - **SEG-E8B-05** (baixo): **corrigido no checklist em 23/10/2026** (sem curinga). Falta conferir a tela URL Configuration na E9b.
 - **SEG-E45-09** (baixo): **encerrado em 23/10/2026.** O responsável confirmou que o valor nunca foi usado fora do ambiente local. A cópia arquivada fica como está (RAT-D012).
 - **SEG-E45-12** (baixo): **aceito pela RAT-D020 em 23/10/2026**, sem correção por ora. A recomendação era opcional: reduzir jwt_expiry (por exemplo 900 s) ou, nas ações sensíveis futuras (E6+), conferir a sessão no Auth (getUser) em vez de só getClaims.
+
+## E9b · Render e dependências (25/11/2026)
+
+**Bloqueia release:** não. **Liberado para o deploy no Render**, com dados fictícios, desde que o responsável siga o `checklist-e9.md` e guarde as evidências do SEG-E9B-08. Dados reais continuam presos à P-05c2 (SEG-E9B-07). Conferência curta (RAT-D020), sobre as mudanças ainda não commitadas da branch `fnd-001/e9`: `render.yaml`, `.node-version`, `src/lib/env.ts`, `src/lib/env.server.ts`, `next.config.ts`, `package.json`/lock, `migrations.yml`, README, checklist e plano (revisão 12). Além da leitura, rodei testes locais com `next start` simulando o Render, os testes unitários e o `npm audit`, e varri a árvore atual e todo o histórico (`git rev-list --all`, 4 commits).
+
+| Item | Severidade | Status |
+|---|---|---|
+| SEG-E9B-01 Proteção do `APP_ENV` no Render, cookies `Secure` e HSTS | informativo | ok |
+| SEG-E9B-02 `render.yaml` e `migrations.yml` sem segredo | informativo | ok |
+| SEG-E9B-03 Dependências (`npm audit`) | informativo | ok |
+| SEG-E9B-04 Documentação de Auth e variáveis | informativo | ok |
+| SEG-E9B-05 Repositório público | médio | aceito pelo responsável (25/11/2026) |
+| SEG-E9B-06 Limites do Supabase Auth por IP, com o IP do servidor | médio | fora_do_escopo_RAT-D020 (já era SEG-E45-05) |
+| SEG-E9B-07 Plano gratuito do Render | baixo sem dados reais; alto com dados reais | aberto, preso à P-05c2 |
+| SEG-E9B-08 Configuração nos painéis (Render, Supabase, GitHub) | informativo | pendente de evidência |
+
+### SEG-E9B-01 · informativo · ok
+
+- **Evidência:**
+  - **Regra.** `isHosted` considera `VERCEL`, `VERCEL_ENV` ou `RENDER`. No Render, `deployEnvIssues` exige `APP_ENV` e recusa `local` (com `trim`), sem depender de `VERCEL_ENV`. Qualquer valor não vazio de `RENDER` conta como hospedagem, inclusive `false`, o que é falha fechada. `getServerEnv` repassa `RENDER`.
+  - **Build.** `assertDeployEnv` roda no topo do `next.config.ts`. Agora valida também as duas variáveis públicas, com a mesma recusa de `sb_secret_` e de JWT `service_role`. As mensagens não repetem valores.
+  - **Provas ao vivo** (com o build local que já existia):
+    - `RENDER=true next start` sem `APP_ENV` dá "APP_ENV: obrigatória…" e o processo sai com código 1, sem atender `/login`;
+    - com `APP_ENV=local`, dá "o valor 'local' não é permitido no Render" e também sai com 1;
+    - com `APP_ENV=production` e a chave secreta presente no ambiente, o hook de instrumentação recusa e todas as respostas viram 500.
+  - **Testes.** `env`, `security-headers` e `supabase/*` passaram (4 arquivos, 43 testes).
+  - **Sem regressão.** Na Vercel, o Preview com `local` continua aceito e a Production com `local` continua recusada. A única mudança é que `assertDeployEnv` passa a exigir as variáveis públicas, o que é mais restritivo. No build local e na CI nada muda: sem `VERCEL`/`RENDER`, `assertDeployEnv({})` não acusa nada, e a CI usa `APP_ENV=local` sem essas variáveis.
+  - **Cabeçalhos.** Confirmei que são fixados no build: com o build local, um `next start` com `APP_ENV=production` não mandou HSTS. No Render isso não é problema, porque o `render.yaml` fixa `APP_ENV=production` por `value`, valendo no build e na execução. Com `production` entram HSTS (`max-age=31536000`, sem `includeSubDomains`, o que é o certo num subdomínio de `onrender.com`) e `upgrade-insecure-requests`.
+  - **Cookies.** O `Secure` depende de `process.env.APP_ENV`, lido em tempo de execução (não é embutido no bundle), e não do protocolo que chega ao `next start`. Por isso o TLS terminar no balanceador do Render não o afeta.
+- **Correção ou próximo passo:** Nenhuma. Se `APP_ENV` mudar no painel, fazer novo build (já está no checklist, passo 4.5).
+
+### SEG-E9B-02 · informativo · ok
+
+- **Evidência:**
+  - **`render.yaml`.** Só `APP_ENV=production` e `LOG_LEVEL=info` têm valor. `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` usam `sync: false`. Não há chave secreta, `service_role`, string de conexão nem `NODE_VERSION`. `autoDeployTrigger: 'off'`, sem bloco `previews` (padrão desligado), `plan: free`, `region: virginia`, `branch: main`.
+  - **`migrations.yml`.** O passo do deploy hook lê `RENDER_DEPLOY_HOOK_URL` só por `env:`, sem `-v`, sem `set -x` e sem `echo` da URL. A resposta do Render (id do deploy) vai para arquivo e só aparecem os primeiros 400 bytes, sem dado sensível. O GitHub mascara o valor do segredo no log.
+  - **Sem mudança.** Continuam iguais: `workflow_dispatch`; checagem de `actor`/`triggering_actor` igual a `athrios` e `ref` igual a `main`; `permissions: contents: read`; `persist-credentials: false`; ordem simulação → `db push` → hook. O `ci.yml` continua sem segredos e sem `pull_request_target`.
+  - **Observações que não são achados.** A linha do `curl` perdeu a quebra `\` e ficou com espaços no meio: é só cosmético e funciona. Um Blueprint do Render sincroniza com a `main`, então mudar o `render.yaml` na `main` muda a configuração do serviço. Só o responsável tem escrita no repositório.
+- **Correção ou próximo passo:** Nenhuma. Opcional: refazer a quebra de linha do `curl` na próxima edição do workflow.
+
+### SEG-E9B-03 · informativo · ok
+
+- **Evidência:**
+  - `npm audit --omit=dev`, rodado nesta revisão: **0 vulnerabilidades**.
+  - `npm ls` mostra `next@16.4.6`, `eslint-config-next@16.4.6` e `zod@4.6.7` no topo, deduplicado no runtime. Isso resolve os 7 avisos moderados do Next 16.4.2 e o alto do zod <4.6.6.
+  - O `npm audit` completo ainda mostra 14 avisos (11 moderados, 3 altos), todos em dependências de desenvolvimento: o CLI `shadcn` (com `zod@3.25.76` aninhado e `@shadcn/registry`), `hono`/`@hono/node-server` (vindos do SDK MCP do shadcn), `minimatch` e `typescript-eslint`.
+  - Nenhum deles é carregado pelo `next start`. No Render eles são instalados pelo `npm ci` do build, mas não são executados: o `next build` não roda ESLint nem shadcn.
+- **Correção ou próximo passo:** Nenhuma para o deploy. Atualizar `shadcn` e `typescript-eslint` quando saírem versões corrigidas, numa rodada de manutenção.
+
+### SEG-E9B-04 · informativo · ok
+
+- **Evidência:**
+  - **Auth.** README, `checklist-e9.md` (passo 3) e `01-plano.md` §10 pedem o Site URL na raiz `https://<serviço>.onrender.com`, sem `/auth/confirm`, com o motivo. A Redirect URL é **só** `https://<serviço>.onrender.com/auth/confirm`. Os três proíbem curinga (citam `https://*.onrender.com/**`, com o motivo) e `localhost`.
+  - **Segredos.** Os três mandam não cadastrar `SUPABASE_SECRET_KEY`, `service_role` nem string de conexão no Render. Os únicos segredos citados são os do GitHub Actions do workflow (token, ref e senha do banco), que não vão para o app.
+  - **Exemplos.** Usam marcadores (`<URL-DO-PROJETO>`, `<CHAVE-PUBLICAVEL>`, `<URL-DO-HOOK>`), e a URL do hook é tratada como segredo. Os modelos de e-mail continuam com `{{ .SiteURL }}`.
+  - **Divergência de documento, não de segurança.** O `01-plano.md` §10 (linhas 400 e 438) ainda diz que o `render.yaml` define `NODE_VERSION=22` e lista `NODE_VERSION` como configuração do Render. O `render.yaml`, o README e o checklist mandam **não** defini-la. O efeito é nulo, porque o valor seria o mesmo.
+- **Correção ou próximo passo:** Alinhar o §10 do plano quando o responsável autorizar a edição. A conferência da tela URL Configuration (o resto do SEG-E8B-05) fica no SEG-E9B-08.
+
+### SEG-E9B-05 · médio · aceito pelo responsável (25/11/2026)
+
+- **Evidência:**
+  - **Decisão.** O repositório `athrios/financeiro-ultra` é **público** por escolha do responsável ("Deixar público", 25/11/2026; R-26 do plano).
+  - **Varredura.** Cobri a árvore atual, com as mudanças não commitadas, e todas as revisões do histórico (`git rev-list --all`, 4 commits). Padrões buscados:
+    - chaves e tokens: `sb_secret_…`, JWT `eyJ….eyJ…`, `SUPABASE_SECRET_KEY=` com valor, `sbp_…`, `gh[pousr]_…`;
+    - ref de projeto: `[a-z]{20}\.supabase\.co`;
+    - deploy hooks: `api.render.com/deploy/srv-`, `hooks.vercel.com`;
+    - credenciais: `postgres://usuário:senha@` e atribuições de senha, token ou segredo;
+    - e-mails.
+  - **Resultado: nenhum segredo real.** Só aparecem:
+    - valores fictícios dos testes (`bundle-secrets.test.ts`, `env.test.ts`, `logger.test.ts`): `sb_secret_` de exemplo, JWT de exemplo e `postgres:postgres@127.0.0.1` do Supabase local;
+    - as variáveis `env(...)` do `config.toml`;
+    - os marcadores `<slug>`/`<serviço>`;
+    - os e-mails `@email.com`/`@exemplo.com`.
+  - **Arquivos ignorados.** `.env*` (exceto `.env.example`, sem valores), `/.acessos/` e `supabase/.temp` nunca foram versionados.
+  - **O que fica exposto:**
+    1. todo o código, as migrations (políticas RLS, funções, grants, triggers), os testes e os seeds fictícios;
+    2. os workflows e o usuário do GitHub `athrios`, que é a trava do workflow de migrations;
+    3. o e-mail pessoal do responsável como autor dos commits (metadado do git, em todos os commits);
+    4. o Brain, o plano, os riscos e esta revisão de segurança, com as fraquezas aceitas: SEG-E8B-02; SEG-E45-05 e SEG-E9B-06 (sem limite próprio de tentativas); SEG-E45-12 (token válido até 1 h depois do logout);
+    5. as memórias dos agentes em `.claude/agent-memory/`;
+    6. a senha antiga, só do ambiente local, em `docs/legado` (SEG-E45-09, encerrado);
+    7. o nome do serviço (`financeiro-ultra`) e as regiões (Virginia no Render, São Paulo no banco). Com o nome, a URL `https://financeiro-ultra.onrender.com` é provável, se o nome estava livre.
+  - **Contexto.**
+    - A URL e a chave publicável do Supabase já ficam visíveis, por desenho, para quem abre o site (cabeçalho CSP `connect-src` e bundle JS). Não pôr o ref no repositório é higiene, não proteção.
+    - Os logs do GitHub Actions passam a ser públicos (com os segredos mascarados).
+    - A proteção real continua sendo o login só por convite, o auto-cadastro desligado, os papéis no banco e a RLS (RAT-D020).
+- **Correção ou próximo passo:** Risco **aceito pelo responsável em 25/11/2026**. Manter a regra: nada de segredo, ref, URL real ou e-mail real em arquivo versionado. Sugestões opcionais, sem custo e sem bloqueio:
+  - ligar **Secret scanning** e **Push protection** do GitHub (gratuitos em repositório público);
+  - usar o e-mail `noreply` do GitHub nos próximos commits (o histórico já publicado não muda);
+  - manter no padrão a aprovação de workflows de colaboradores externos e de primeira contribuição.
+
+  Se um segredo vazar, a correção é **trocar o segredo**, não reescrever o histórico.
+
+### SEG-E9B-06 · médio · fora_do_escopo_RAT-D020
+
+- **Evidência:**
+  - O login, a recuperação e a confirmação chamam o Supabase Auth a partir do servidor (Server Actions). Por isso os limites do Auth por IP (tentativas de login e envio de e-mail) valem para o **IP de saída do Render**, o mesmo para todos os usuários.
+  - Como já era na Vercel (SEG-E45-05), um atacante que esgote o limite deixa todos sem login ou sem recuperação por alguns minutos. É indisponibilidade, sem vazamento, e não há limite por atacante.
+  - Com o repositório público, isso fica documentado para qualquer um. Sem dados reais, o impacto é baixo.
+- **Correção ou próximo passo:** Nenhuma nesta fase: a RAT-D020 tira do escopo o limite próprio e o CAPTCHA. Rever se houver abuso real ou quando entrarem dados reais. SMTP próprio (P-25) reduz o gargalo de e-mails.
+
+### SEG-E9B-07 · baixo sem dados reais; alto com dados reais · aberto, preso à P-05c2
+
+- **Evidência:** O `render.yaml` usa `plan: free`. O Render não recomenda esse plano para produção: 512 MB, dorme após cerca de 15 minutos sem uso, sem garantia de serviço (R-24, R-25). Somado ao Supabase Free sem backup automático (R-18), não serve para dados reais. Não afeta a confidencialidade.
+- **Correção ou próximo passo:** Plano pago (hospedagem e Supabase) e backup antes de qualquer dado real (P-05c2). Até lá, só dados fictícios. Este item **bloqueia a entrada de dados reais**, não o deploy de teste.
+
+### SEG-E9B-08 · informativo · pendente de evidência
+
+- **Evidência:** Não foi possível ver daqui a configuração dos painéis. Pelo checklist, faltam estas evidências (sem segredos):
+  1. o Web Service criado à mão no Render **apagado** antes do Blueprint. Um serviço manual tem deploy automático por padrão e configuração própria;
+  2. a lista dos **nomes** das variáveis do serviço, sem `SUPABASE_SECRET_KEY`, `service_role`, string de conexão nem `NODE_VERSION`;
+  3. deploy automático desligado, um push na `main` que não publicou nada e Pull Request Previews desligados;
+  4. a tela URL Configuration do Supabase com o Site URL na raiz e uma única Redirect URL `/auth/confirm`, sem curinga e sem `localhost`. Isso fecha o SEG-E8B-05;
+  5. auto-cadastro desligado (resposta `signup_disabled` do passo 9), senha mínima 10 e `secure_password_change`;
+  6. a resposta de `/login` em produção com `Strict-Transport-Security` e, depois do login, cookies de sessão com `Secure; HttpOnly; SameSite=Lax`;
+  7. quando o Actions voltar, o job pulado para outro usuário.
+
+  Dois cuidados:
+  - não ligar o cache de borda (edge caching) do Render para o serviço sem nova revisão;
+  - se o login acusar origem inválida de Server Action atrás do balanceador, não contornar com um `serverActions.allowedOrigins` largo.
+- **Correção ou próximo passo:** O responsável junta essas evidências fora do repositório e as entrega para uma conferência curta depois do primeiro deploy.
+
+**Não verificado nesta conferência:**
+
+- Painéis do Render, do Supabase hospedado e do GitHub, e deploy real: estão no SEG-E9B-08.
+- Comportamento do balanceador do Render com `X-Forwarded-Host`/`Host` e a checagem de origem das Server Actions atrás dele: ficam para o smoke do passo 8, que exercita o login.
+- e2e, pgTAP e um build novo com `RENDER=true`. O dev relatou que o build falha logo no início; eu provei a falha na subida.
+- Transferência internacional de dados pessoais pelo servidor em Virginia (LGPD). Não é achado técnico: fica para o responsável avaliar antes dos dados reais, junto da P-05c2, como **DECISÃO PENDENTE** se for o caso.
+
+**Pendências após a E9b:**
+
+- SEG-E9B-08: evidências dos painéis, com o resto do SEG-E8B-05.
+- SEG-E9B-07: bloqueia dados reais até a P-05c2.
+- SEG-E9B-04: alinhar o `NODE_VERSION` no plano.
+- SEG-E9B-05 e SEG-E9B-06: aceitos, sem ação.

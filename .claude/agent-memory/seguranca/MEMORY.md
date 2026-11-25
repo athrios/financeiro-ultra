@@ -1,2 +1,2 @@
 - [Triagem E0 FND-001](project_fnd001-triagem-e0.md) — audit residual dev-only (braces (resolvido em 23/10)), RAT-D019 vale para docs, .env.local nao legivel
-- [Revisao E4+E5+E8b FND-001](project_fnd001-revisao-e4-e5.md) — E8b 23/10 sem bloqueio; SEG-E8B-05 corrigido; strict-origin em /auth/confirm; cobrar E9b
+- [Revisao E4+E5+E8b+E9b FND-001](project_fnd001-revisao-e4-e5.md) — E9b 25/11 liberado (Render, repo publico aceito); cobrar evidencias dos paineis SEG-E9B-08

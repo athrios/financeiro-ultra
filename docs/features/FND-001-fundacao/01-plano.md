@@ -5,7 +5,7 @@
 | Feature | FND-001 — Fundação |
 | Agente | `engenheiro-software` |
 | Data | 22/10/2026 |
-| Status | **APROVADO** pelo responsável em 22/10/2026 ("sim, aprovo"). **Gate G0 aprovado**: P-04b respondida (RAT-D017). Regra de divisão fechada: sempre 1/n (RAT-D015). **Andamento em 23/10/2026:** E0, E2, E3 e E6 concluídas, com a E0 publicada na `main` do repositório privado. E4 e E5 implementadas, validadas e incorporadas à `main`: segurança sem bloqueio e QA aprovado com ressalvas (`05-seguranca.md`, `06-qa.md`). E7, E8 e E8b concluídas na branch `fnd-001/e7-e8`, com segurança sem bloqueio e QA aprovado com ressalvas. E9 em andamento pelo responsável, com a opção B e sem CI (revisão 11). Depois: E9b e E10 |
+| Status | **APROVADO** pelo responsável em 22/10/2026 ("sim, aprovo"). **Gate G0 aprovado**: P-04b respondida (RAT-D017). Regra de divisão fechada: sempre 1/n (RAT-D015). **Andamento em 23/10/2026:** E0, E2, E3 e E6 concluídas, com a E0 publicada na `main` do repositório privado. E4 e E5 implementadas, validadas e incorporadas à `main`: segurança sem bloqueio e QA aprovado com ressalvas (`05-seguranca.md`, `06-qa.md`). E7, E8 e E8b concluídas na branch `fnd-001/e7-e8`, com segurança sem bloqueio e QA aprovado com ressalvas. E9 em andamento pelo responsável, com a opção B e sem CI (revisão 11). **Andamento em 25/11/2026:** a hospedagem passou da Vercel para o **Render** (RAT-D022, revisão 12). A E9 continua na branch `fnd-001/e9`, com a adaptação do código ao Render e a atualização do Next e do zod. O repositório `athrios/financeiro-ultra` passou a ser público, por decisão do responsável. Depois: E9b e E10 |
 | Fontes lidas | `brain-mensalidades-rateio/` (00 a 13 + README), `.claude/agents/*`, `.claude/docs/*`, código e banco do repositório |
 | Revisão 1 (22/10/2026) | P-01 a P-06 respondidas pelo responsável e registradas no Brain como RAT-D010 a RAT-D015. Plano ajustado: empresa única, perfis + login das partes, nome "Financeiro Ultra", GitHub, divisão igualitária por padrão. Ver seção 18 |
 | Revisão 2 (22/10/2026) | Esclarecimento da divisão: partes iguais entre as partes indicadas no cliente (5 cadastradas, 3 indicadas → ÷ 3), registrado em RAT-D015. Hospedagem na Vercel + banco Supabase criado pelo responsável (RAT-D016). Ajustadas as seções 1.3, 1.4, 1.5, 2, 7.3, 10, 11, 13 a 19 |
@@ -18,6 +18,7 @@
 | Revisão 9 (23/10/2026) | Respostas do responsável. A E4/E5 entrou na `main` por merge direto. O valor fixo antigo da senha local nunca foi usado fora do ambiente local, o que encerra o SEG-E45-09. O motivo passa a ser opcional nas ações auditadas (RAT-D021), o que muda o CA-09. "Prossiga": E7 e E8 liberadas na branch `fnd-001/e7-e8`, junto com os ajustes baixos do QA. O SEG-E45-12 fica aceito pela RAT-D020 |
 | Revisão 10 (23/10/2026) | E7, E8 e E8b executadas na branch `fnd-001/e7-e8`. O motivo opcional (RAT-D021) foi aplicado no banco e nos testes. Na E7, o upload passa pelo servidor, que confere tipo, tamanho e hash; a duplicidade é detectada e a leitura só acontece por URL assinada. O caminho direto pela API com hash falso é risco residual aceito pela RAT-D020. Na E8 entraram a CI no GitHub Actions e um smoke ponta a ponta por HTTP no lugar do Playwright, que não foi aprovado (D-E8-01). Também entraram o workflow de migrations restrito a `athrios`, o script de bootstrap e o `checklist-e9.md`. As Redirect URLs ficaram sem curinga (SEG-E8B-05). A E8b não bloqueia e o QA aprovou com ressalvas; a revalidação dos ajustes foi aprovada. A primeira execução real da CI é conferida no GitHub. Registros em `04`, `05` e `06` |
 | Revisão 11 (24/10/2026) | Respostas do responsável. A E7/E8 entrou na `main` por merge, sem CI. O GitHub Actions não roda porque a cobrança da conta do GitHub está pendente, e o responsável decidiu seguir sem CI por enquanto. A parte "na CI" do CA-03 fica pendente; a sequência da CI foi verificada localmente. O workflow de migrations também depende do Actions. Por isso, a linha de base inicial é aplicada pelo próprio responsável com o CLI do Supabase (opção B), como exceção ao item 4 de "Migrations × deploy" (seção 10). E9 iniciada: o responsável está criando o projeto Supabase. O `checklist-e9.md` ganhou a ordem para a opção B |
+| Revisão 12 (25/11/2026) | A pedido do responsável, a hospedagem passa da Vercel para o **Render** (RAT-D022, que revisa a RAT-D016 só quanto à hospedagem). Web Service Node com `next start`, criado pelo Blueprint `render.yaml`, região Virginia, Node 22 fixado em `.node-version`, script `start:render` e deploy manual. A proteção do `APP_ENV` (SEG-E45-06) passa a reconhecer o Render. O `next` vai para 16.4.6 e o `zod` para 4.6.6, por avisos do `npm audit`. O repositório fica público, como risco aceito pelo responsável. Ajustadas a linha de status e as seções 10, 16 e 17. As demais menções à Vercel (seções 2, 11 a 15, 18 e 19) ficam como histórico; para a hospedagem vale a seção 10 |
 
 ## Como ler as classificações
 
@@ -363,52 +364,65 @@ Convenção de nomes:
 
 ## 10. Ambientes
 
-**DECISÃO OFICIAL EXISTENTE:** repositório no GitHub (RAT-D014); aplicação na Vercel e banco em projeto Supabase criado pelo responsável (RAT-D016).
+**DECISÃO OFICIAL EXISTENTE:** repositório no GitHub (RAT-D014); banco em projeto Supabase criado pelo responsável (RAT-D016); aplicação no **Render**, como serviço web, com configuração no `render.yaml` e publicação manual pelo responsável (RAT-D022, que revisa a RAT-D016 quanto à hospedagem; revisão 12). Até a revisão 11 a aplicação ia para a Vercel.
 
 | Ambiente | Banco | Aplicação | Dados | Quem aplica migrations |
 |---|---|---|---|---|
 | Local | Supabase CLI + Docker | `next dev` | Seed fictício | Desenvolvedor (`db reset`) |
-| Homologação | **Fase 1** (sem dados reais): o próprio projeto Supabase único. **Fase 2** (antes dos dados reais): projeto separado ou outra solução decidida em P-05c2 | Vercel **Preview** (por branch/PR) | Fictícios | Nenhuma migration de PR é aplicada no banco remoto enquanto ele for único |
-| Produção | Projeto Supabase criado pelo responsável (RAT-D016) | Vercel **Production** | Reais | Pipeline disparado com aprovação humana |
+| Homologação | **Fase 1** (sem dados reais): o próprio projeto Supabase único. **Fase 2** (antes dos dados reais): projeto separado ou outra solução decidida em P-05c2 | **Fase 1:** o próprio serviço único do Render, enquanto não houver dados reais. Sem ambientes de Preview do Render (PROPOSTA) | Fictícios | Nenhuma migration de PR é aplicada no banco remoto enquanto ele for único |
+| Produção | Projeto Supabase criado pelo responsável (RAT-D016) | Web Service do Render, branch `main` (RAT-D022) | Reais | Pipeline disparado com aprovação humana |
 
 **Banco único** — PROPOSTA:
 
 - Enquanto não houver dados reais, o projeto criado serve de homologação.
-- O Preview só testa código compatível com o schema já aplicado.
-- Antes da entrada de dados reais, decidir P-05c2. Do contrário, os deploys de Preview passam a rodar contra dados reais (R-17).
+- Os Previews do Render ficam desligados: eles rodariam com as mesmas variáveis e o mesmo banco do serviço principal.
+- Antes da entrada de dados reais, decidir P-05c2. Do contrário, qualquer teste de código novo passa a rodar contra dados reais (R-17).
 
 **Região:**
 
 - Supabase em `sa-east-1` (São Paulo) — **DECISÃO OFICIAL EXISTENTE (RAT-D018)**. A região é escolhida na criação do projeto e não muda depois.
-- Funções da Vercel em `gru1` (São Paulo), para ficarem perto do banco — PROPOSTA.
+- Serviço do Render em `virginia` (EUA) — **DECISÃO OFICIAL EXISTENTE (RAT-D022)**. O Render não tem região na América do Sul, e a região também não muda depois de criado o serviço. Consequência: cada ida ao banco atravessa a distância Virginia ↔ São Paulo (R-23).
 
 **Planos dos serviços** — PROPOSTA, a confirmar por você (P-05c2, R-18):
 
-- Pelos termos da Vercel, o plano Hobby é para uso pessoal e não comercial. Uso por uma empresa pede o plano Pro.
+- Render no plano gratuito na E9: 512 MB de memória, o serviço "dorme" depois de cerca de 15 minutos sem tráfego (R-24), e o próprio Render não o recomenda para produção (R-25). Antes dos dados reais e do uso diário, passar para um plano pago (P-05c2).
 - No Supabase, projetos do plano Free são pausados após inatividade e **não têm backup automático**: backups diários só a partir do Pro, e PITR é um adicional pago. Dados reais só no Pro, ou, se o Free for aceito temporariamente, com rotina agendada de `supabase db dump` e cópia do Storage para fora do Supabase, com teste de restauração documentado.
 - A organização Supabase da sua conta já tem 2 projetos (Ambitask e luv-platform). Se ela estiver no plano Free, o limite de projetos gratuitos ativos pode impedir um terceiro.
 - Nesta revisão, os planos e limites citados não foram verificados contra as páginas atuais de preços; confirme no momento da contratação.
 
-**Configuração da Vercel e do Supabase hospedado** — PROPOSTA:
+**Configuração do Render e do Supabase hospedado** — PROPOSTA (revisão 12; a configuração da Vercel das revisões anteriores deixa de valer):
 
-- Variáveis por ambiente (Production e Preview): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `APP_ENV`, `LOG_LEVEL`.
-- **Não** cadastrar `SUPABASE_SECRET_KEY` na Vercel: na FND o runtime da aplicação não a usa, porque convites e criação de usuários são feitos pelo painel do Supabase (seção 6; P-24 decide o futuro). Se for usada a integração Supabase ↔ Vercel, revisar as variáveis que ela cria e remover chaves secretas e strings de conexão não usadas (R-19).
+- **Blueprint `render.yaml`** versionado, sem nenhum segredo:
+  - serviço `type: web`, `runtime: node`, `region: virginia`, `plan: free`, `branch: main`;
+  - build `npm ci && npm run build`; start `npm run start:render` (`next start`, que lê a `PORT` definida pelo Render, padrão 10000). O `npm start` local continua na porta 3001;
+  - `healthCheckPath: /login`;
+  - `autoDeployTrigger: 'off'`: o deploy é manual, pelo responsável, ou pelo deploy hook do workflow de migrations;
+  - `envVars`: `APP_ENV=production` e `LOG_LEVEL=info`; `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` com `sync: false`, para o painel pedir os valores na criação.
+- **Node 22** fixado no arquivo `.node-version`. Sem isso, serviços novos no Render usariam o Node 24. O `.node-version` é a fonte única: **não** se define `NODE_VERSION` no `render.yaml` nem no painel, porque no Render essa variável tem precedência sobre o arquivo e poderia divergir (SEG-E9B, 25/11/2026).
+- O Render define `RENDER=true` no build e na execução. A proteção do `APP_ENV` (SEG-E45-06, `src/lib/env.ts`) passa a reconhecer essa variável: no Render, `APP_ENV` é obrigatória e `local` é recusado. O build também falha logo no início se faltarem as variáveis públicas.
+- Os cabeçalhos de segurança (seção 12) e as variáveis `NEXT_PUBLIC_*` são fixados **no build**. Trocar `APP_ENV` ou a URL do Supabase no painel exige novo deploy, não basta reiniciar.
+- O TLS termina no balanceador do Render, que redireciona HTTP para HTTPS. Com `APP_ENV=production`, o app envia HSTS e marca os cookies como `Secure`.
+- `vercel.json` fica no repositório como referência (RAT-D012), sem efeito no Render.
+- **Não** cadastrar `SUPABASE_SECRET_KEY` no Render: na FND o runtime da aplicação não a usa, porque convites e criação de usuários são feitos pelo painel do Supabase (seção 6; P-24 decide o futuro). Se ela aparecer com `APP_ENV` diferente de `local`, a aplicação recusa subir (R-19).
+- **Repositório público** (decisão do responsável, 25/11/2026; R-26): nenhum arquivo versionado pode conter segredo, ref do projeto Supabase, URL do serviço ou e-mail real. Os documentos usam marcadores como `<URL-DO-PROJETO>` e `<serviço>`.
+- **Reversão:** a E9 não tem migration, então reverter é só código: Rollback para o deploy anterior no painel do Render, ou revert do commit na `main` seguido de novo deploy manual.
 - Supabase Auth:
-  - Site URL = domínio de produção;
-  - Redirect URLs = domínio de produção + `/auth/confirm` e, se o Preview precisar, a URL fixa de branch (`https://<projeto>-git-<branch>-<slug>.vercel.app/auth/confirm`). Desde a revisão 10 não se usa curinga, nem o restrito ao slug, porque ele também casaria com projetos de outras contas da Vercel (SEG-E8B-05). **Sem `localhost`** no projeto hospedado: o desenvolvimento usa o Supabase local, cujas URLs ficam no `config.toml`. Nesse arquivo, `site_url` e `additional_redirect_urls` devem usar a porta real do `next dev` (hoje 3001, porque a 3000 está ocupada — R-16). **Proibido** o curinga amplo `https://*.vercel.app/**`, que permitiria a qualquer site hospedado na Vercel receber tokens de convite e de recuperação;
+  - Site URL = `https://<serviço>.onrender.com`, **sem caminho**. Os templates de e-mail montam o link como `{{ .SiteURL }}/auth/confirm` (`supabase/templates/invite.html`); um Site URL com `/auth/confirm` geraria `/auth/confirm/auth/confirm`;
+  - Redirect URLs = só `https://<serviço>.onrender.com/auth/confirm`, **sem curinga** (SEG-E8B-05). Quando houver domínio próprio (P-25), Site URL e Redirect URL passam para ele. **Sem `localhost`** no projeto hospedado: o desenvolvimento usa o Supabase local, cujas URLs ficam no `config.toml`. Nesse arquivo, `site_url` e `additional_redirect_urls` devem usar a porta real do `next dev` (hoje 3001, porque a 3000 está ocupada — R-16). **Proibido** curinga amplo, como `https://*.onrender.com/**`, que permitiria a qualquer site hospedado no Render receber tokens de convite e de recuperação;
   - templates de e-mail de convite e de recuperação apontando para `/auth/confirm` (seção 6);
   - auto-cadastro desligado. Projetos novos no Supabase vêm com o cadastro aberto, e o `supabase db push` não aplica o `config.toml`. Aplicar a configuração do Auth com `supabase config push` (pelo responsável) ou por checklist no painel, e verificar no CA-15.
 - SMTP próprio no Supabase Auth: o envio de e-mail padrão é limitado e voltado a testes. Provedor e domínio: P-25.
-- Smoke test do proxy de sessão, do login e do convite no primeiro deploy de Preview. O proxy do Next 16 roda em Node.js, e a Vercel usa o adaptador oficial.
+- Smoke test do proxy de sessão, do login e do convite no primeiro deploy do Render, ainda sem dados reais. O proxy do Next 16 roda em Node.js, dentro do próprio `next start`.
 - **Migrations × deploy** — ordem obrigatória:
-  1. as migrations rodam só **depois do merge** na branch principal, num workflow do GitHub Actions (`supabase db push`) **disparado manualmente pelo responsável** (`workflow_dispatch`). O repositório deve ser privado, e as regras de aprovação obrigatória dos GitHub Environments não estão disponíveis em repositório privado nos planos Free, Pro e Team. Por isso, a restrição a quem dispara fica no próprio workflow:
+  1. as migrations rodam só **depois do merge** na branch principal, num workflow do GitHub Actions (`supabase db push`) **disparado manualmente pelo responsável** (`workflow_dispatch`). Quando este item foi escrito, o repositório era privado, e as regras de aprovação obrigatória dos GitHub Environments não estão disponíveis em repositório privado nos planos Free, Pro e Team. Por isso, a restrição a quem dispara fica no próprio workflow:
      - o job só roda se `github.actor` for o usuário do responsável (`if: github.actor == '<usuario-do-responsavel>'`);
      - permissão de escrita no repositório só para o responsável; tokens de agente, se existirem, com escopo mínimo e sem permissão de Actions;
-  2. o deploy de Production na Vercel só acontece **depois** da migration aplicada. Desligar o deploy automático de Production (Ignored Build Step) e publicar pelo mesmo workflow, após o `db push` (deploy hook ou `vercel deploy --prod`);
+     - desde a revisão 12 o repositório é público. A checagem de `github.actor` continua valendo; num repositório público, a aprovação obrigatória dos GitHub Environments passa a estar disponível e pode ser somada a ela, se o responsável quiser;
+  2. o deploy de Production no Render só acontece **depois** da migration aplicada. O deploy automático fica desligado (`autoDeployTrigger: 'off'`), e o mesmo workflow publica após o `db push`, pelo deploy hook do Render (segredo `RENDER_DEPLOY_HOOK_URL`, no lugar do antigo hook da Vercel). Enquanto o Actions estiver parado (revisão 11), o responsável aplica a migration primeiro e só depois faz o Manual Deploy;
   3. migrations seguem expand/contract (seção 7.5), para que a versão anterior do código funcione com o schema novo durante a publicação;
   4. nenhuma migration é aplicada direto do computador de desenvolvimento. Exceção da revisão 11: a linha de base inicial é aplicada pelo próprio responsável, no computador dele, com o CLI do Supabase, porque o GitHub Actions está bloqueado pela cobrança da conta. O workflow volta a ser o caminho padrão quando o Actions funcionar;
   5. não ativar a integração GitHub do Supabase nem o Branching, que aplicam migrations sozinhos.
-- **Quem faz o quê na E9:** o responsável age nos painéis (importar o repositório na Vercel, criar o projeto Supabase, cadastrar segredos do GitHub, SMTP, domínio). O agente entrega código, workflow, script de bootstrap e documentação. Se o agente precisar de CLI, os tokens têm escopo mínimo, são fornecidos pelo responsável fora de `.acessos/` e nunca são versionados.
+- **Quem faz o quê na E9:** o responsável age nos painéis (criar o serviço no Render pelo Blueprint, apagando antes o Web Service criado à mão, criar o projeto Supabase, cadastrar segredos do GitHub, SMTP, domínio). O agente entrega código, workflow, script de bootstrap e documentação. Se o agente precisar de CLI, os tokens têm escopo mínimo, são fornecidos pelo responsável fora de `.acessos/` e nunca são versionados.
 
 **Variáveis** — PROPOSTA:
 
@@ -416,9 +430,12 @@ Convenção de nomes:
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Público | Cliente Supabase |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Público | Cliente Supabase (com RLS) |
-| `SUPABASE_SECRET_KEY` | **Secreto** | Só scripts locais e administração. Na FND, nunca no runtime web e nunca cadastrada na Vercel; uso futuro restrito depende de P-24 |
-| `APP_ENV` | Servidor | `local` / `staging` / `production` |
+| `SUPABASE_SECRET_KEY` | **Secreto** | Só scripts locais e administração. Na FND, nunca no runtime web e nunca cadastrada no Render; uso futuro restrito depende de P-24 |
+| `APP_ENV` | Servidor | `local` / `staging` / `production`. Obrigatória no Render, onde `local` é recusado |
 | `LOG_LEVEL` | Servidor | Nível do logger |
+| `RENDER` | Definida pelo Render | Identifica a hospedagem para a proteção do `APP_ENV` (SEG-E45-06) |
+| `PORT` | Definida pelo Render | Porta do `next start` (padrão 10000) |
+| `NODE_VERSION` | Não definir | A versão vem do `.node-version` (`22`); a variável teria precedência e poderia divergir |
 | SMTP | Configurado no Supabase, não na app | Convites e recuperação de senha |
 
 Também PROPOSTA:
@@ -619,11 +636,15 @@ Aprovação do plano ──┬─► E0 ─────────────�
 | R-15 | Documentos do Brain em rascunho usados como verdade | Média | Tratar como insumo; promover via `11-Decisoes.md` |
 | R-16 | Ambiente local depende de Docker e de portas livres. A 3000 está ocupada, então o app sobe na 3001, enquanto o `config.toml` do Supabase local aponta para a 3000, o que quebraria os links de convite locais | Baixa | Fixar a porta do `next dev` no README e alinhar `site_url`/`additional_redirect_urls` do `config.toml` (E5) |
 | R-17 | Banco único compartilhado entre Preview e Production: código em teste rodando contra dados reais; migration de PR alterando o banco de produção | Média agora; **Alta** com dados reais | Usar o projeto como homologação até os dados reais; nenhuma migration de PR no banco remoto; decidir P-05c2 antes |
-| R-18 | Planos gratuitos em uso comercial: Vercel Hobby (não comercial); Supabase Free (pausa por inatividade, **sem backup automático**) | **Alta** com dados reais | Dados reais só no plano Pro, ou com rotina própria de `db dump` + cópia do Storage e restauração testada (P-05c2) |
-| R-20 | Deploy automático da Vercel publicar código antes da migration correspondente | Alta | Deploy de Production pelo workflow, depois do `db push` (seção 10); expand/contract |
+| R-18 | Planos gratuitos em uso comercial: Render gratuito (revisão 12; antes, Vercel Hobby, não comercial); Supabase Free (pausa por inatividade, **sem backup automático**) | **Alta** com dados reais | Dados reais só em planos pagos, ou com rotina própria de `db dump` + cópia do Storage e restauração testada (P-05c2) |
+| R-20 | Deploy automático publicar código antes da migration correspondente (antes, na Vercel; desde a revisão 12, no Render) | Alta | `autoDeployTrigger: 'off'` no `render.yaml`; deploy pelo workflow, depois do `db push`, ou manual pelo responsável depois da migration (seção 10); expand/contract |
 | R-21 | Integração GitHub do Supabase ou Branching aplicarem migrations sozinhos, inclusive as antigas de 07/10 | Alta | Não ativar (14.1); migrations antigas fora de `supabase/migrations/` (7.5) |
 | R-22 | Configuração do Auth hospedado diferente da local (cadastro aberto, Redirect URLs amplas) | Alta | `supabase config push` ou checklist; verificação no CA-15 |
-| R-19 | Integração Supabase ↔ Vercel pode criar variáveis secretas na Vercel | Média | Configurar as variáveis manualmente, ou remover as secretas não usadas; checagem na CI (CA-12, CA-15) |
+| R-19 | Chave secreta nas variáveis da hospedagem: antes, pela integração Supabase ↔ Vercel; desde a revisão 12, por cadastro manual no painel do Render | Média | Variáveis cadastradas à mão, só as da seção 10; `render.yaml` sem segredos; a aplicação recusa subir com `SUPABASE_SECRET_KEY` fora do ambiente local; conferência na E9b (CA-12, CA-15) |
+| R-23 | Latência entre o serviço em Virginia e o banco em São Paulo (RAT-D022, RAT-D018). Cada consulta paga a ida e volta entre os dois continentes (estimativa não medida: na casa de 100 ms ou mais), e páginas com consultas em sequência somam esse tempo | Média | Medir o tempo das telas no smoke da E9; evitar consultas em cascata, agrupando em uma consulta ou RPC; se o tempo ficar inaceitável, levar ao responsável (região ou provedor) — DECISÃO PENDENTE só se ocorrer |
+| R-24 | Plano gratuito do Render "dorme" depois de cerca de 15 minutos sem tráfego; o primeiro acesso seguinte demora para responder | Baixa sem dados reais; **Média** no uso diário | Aceito na E9, sem dados reais; plano pago antes do uso diário (P-05c2) |
+| R-25 | O Render não recomenda o plano gratuito para produção (512 MB, sem garantias de serviço) | **Alta** com dados reais | Mesmo tratamento do R-18: plano pago antes dos dados reais (P-05c2) |
+| R-26 | Repositório público: código, migrations, workflow e documentação ficam visíveis para qualquer pessoa, inclusive o histórico | Média → **aceito pelo responsável** (25/11/2026) | Nada de segredo, ref do projeto Supabase, URL do serviço ou e-mail real em arquivo versionado (marcadores `<URL-DO-PROJETO>`, `<serviço>`); a segurança confere a `main` e o histórico e registra o risco aceito no `05-seguranca.md`; a proteção real continua no login por convite, nos papéis no banco e na RLS (RAT-D020) |
 
 ---
 
@@ -646,10 +667,11 @@ Aprovação do plano ──┬─► E0 ─────────────�
 | RAT-D013 | Nome do produto: **Financeiro Ultra** | 11 (22/10) | Shell, títulos e metadados |
 | RAT-D014 | Repositório no GitHub, criado pelo responsável | 11 (22/10) | E0 e CI |
 | RAT-D015 | Divisão **sempre** 1/n entre os sócios indicados no cliente (2 → 50%, 3 → 33,33…%, 4 → 25%); sem percentual configurado, sem divisão própria por cliente, sem normalização | 11 (22/10) | Feature Rateio; primitivas de rateio exato pela fração, com fechamento em centavos (E6) |
-| RAT-D016 | Aplicação na Vercel; banco em projeto Supabase criado pelo responsável; stack de 07/10 consolidada (Next.js, TypeScript, Supabase PostgreSQL/Auth, Tailwind, shadcn/ui). O Storage é proposta do plano | 11 (22/10) | Seção 10; E9 |
+| RAT-D016 | Banco em projeto Supabase criado pelo responsável; stack de 07/10 consolidada (Next.js, TypeScript, Supabase PostgreSQL/Auth, Tailwind, shadcn/ui). O Storage é proposta do plano. A hospedagem na Vercel foi **revisada** pela RAT-D022 (25/11) | 11 (22/10; revisada em 25/11) | Seção 10; E9 |
 | RAT-D017 | Vocabulário: Parte = **Sócio**; Cliente, Recebedor e demais termos do Brain mantidos; nada de "Indicador"/"Empresa" | 11 (22/10) | Interface, código e banco (E2, E3, E5) |
 | RAT-D018 | Projeto Supabase em São Paulo (`sa-east-1`) | 11 (22/10) | Criação do projeto; E9 |
 | RAT-D019 | Seeds, testes e exemplos só com nomes fictícios | 11 (22/10) | E0 (antes do primeiro commit); CA-01 |
+| RAT-D022 | Aplicação no **Render**, como serviço web, região Virginia (não há região na América do Sul); configuração no `render.yaml`; publicação manual pelo responsável. Revisa a RAT-D016 só quanto à hospedagem | 11 (24/11 e 25/11) | Seção 10; E9; R-23 a R-25 |
 | RN-002 | Recebimento confirmado pertence a uma competência | 03 (ativo) | Constraint futura |
 | RN-008 | Duplicidade por hash, TXID, EndToEnd… | 03 (ativo) | `sha256` único em `proof_files` |
 | RN-010 / RN-011 | `saldo = recebido − devido`; soma dos saldos = 0 | 03, 07 (ativos) | Convenção de sinal única em todo o sistema |

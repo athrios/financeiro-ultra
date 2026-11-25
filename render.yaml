@@ -1,0 +1,28 @@
+# Blueprint do Render (FND-001, E9). Cria o Web Service pelo painel: New > Blueprint.
+#
+# - Nenhuma chave secreta nem string de conexão do banco entra aqui. O app usa só a URL do
+#   projeto Supabase e a chave publicável, que o painel pede na criação (sync: false).
+# - Deploy manual (autoDeployTrigger: 'off'): quem publica é o responsável, depois das migrations.
+# - NEXT_PUBLIC_* são fixadas no build. Mudar qualquer variável exige um novo deploy.
+# - A versão do Node vem do arquivo .node-version (não defina NODE_VERSION aqui).
+# - Previews ficam desligados (padrão).
+services:
+  - type: web
+    name: financeiro-ultra
+    runtime: node
+    region: virginia
+    plan: free
+    branch: main
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start:render
+    healthCheckPath: /login
+    autoDeployTrigger: 'off'
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+        sync: false

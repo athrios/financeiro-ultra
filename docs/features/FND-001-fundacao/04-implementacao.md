@@ -696,3 +696,57 @@ O cenário de CDP foi executado antes do `db reset` final; os usuários de teste
 ### Handoff
 
 Solicitar revisão de `seguranca` (B1, e a troca de `no-referrer` por `strict-origin` no B2) e de `qa` (repetir o clique antes da hidratação em navegador real).
+
+## E9 · Render e dependências (25/11/2026)
+
+Parte A (código) da adaptação ao Render (plano aprovado pelo responsável; `01-plano.md`, revisão 12, seção 10). A documentação (README e checklist da E9) é a parte B. Nada foi aplicado em ambiente hospedado.
+
+### O que mudou
+
+| Requisito | Mudança | Arquivos |
+|---|---|---|
+| Dependências | `next` e `eslint-config-next` 16.4.2 para 16.4.6 (exatas, juntas); `zod` para `^4.6.6` (instalado 4.6.7). `npm audit --omit=dev`: 0 vulnerabilidades (antes: Next com 7 moderadas e zod com 1 alta). | `package.json`, `package-lock.json` |
+| SEG-E45-06 no Render | Hospedagem passa a ser `VERCEL`, `VERCEL_ENV` ou `RENDER`. Nela, `APP_ENV` é obrigatória; `local` é recusado com `VERCEL_ENV=production` e sempre com `RENDER`. Fora da hospedagem retorna `[]` (build local e CI não mudam). Mensagens em português, sem valores. | `src/lib/env.ts` |
+| Falha no início do build | `assertDeployEnv` (chamada em `next.config.ts`) também valida as variáveis públicas do Supabase na hospedagem, com o mesmo `publicSchema`. `parseServerEnv` continua chamando só `deployEnvIssues`, sem duplicar mensagens. | `src/lib/env.ts` |
+| Repasse de `RENDER` | `getServerEnv` passa `RENDER`; comentário de `next.config.ts` cita Vercel ou Render. | `src/lib/env.server.ts`, `next.config.ts` |
+| Porta | Novo `start:render` (`next start`, lê `PORT`, escuta em 0.0.0.0). O `start` local segue na 3001. | `package.json` |
+| Node | `.node-version` com `22` (fonte única da versão; sem `NODE_VERSION` no Blueprint). | `.node-version` |
+| Blueprint | Um Web Service (`financeiro-ultra`, Virginia, plano free, branch `main`, deploy manual, health check `/login`). `APP_ENV=production`, `LOG_LEVEL=info`; URL e chave publicável do Supabase com `sync: false`. Sem segredo, sem chave secreta, sem string de conexão. | `render.yaml` |
+| Workflow | O passo do deploy hook da Vercel virou o do Render (segredo `RENDER_DEPLOY_HOOK_URL`, `curl -fsS` em POST, valor só por `env:`, sem eco). Cabeçalho atualizado. Resto igual. | `.github/workflows/migrations.yml` |
+| Testes | 9 testes novos no bloco SEG-E45-06: `RENDER` sem `APP_ENV`, com `local`, `production` e `staging`; `assertDeployEnv` na hospedagem sem as públicas (lista as duas e junta com `APP_ENV` ausente: 3 itens), com chave secreta no lugar da publishable (sem eco do valor) e com tudo certo; fora da hospedagem nada muda; sem duplicar mensagens no `parseServerEnv`. O teste existente da Vercel passou a informar as variáveis públicas em `assertDeployEnv`. | `src/lib/env.test.ts` |
+
+### Notas das versões 16.4.3 a 16.4.6 (changelog do Next, lido para `proxy`, Cache Components e Server Actions)
+
+- 16.4.3: "Don't load the app-page runtime in proxy.ts" e "Avoid loading standalone React in server bootstrap" (afetam o `proxy` do projeto, de forma interna; build e e2e verdes).
+- 16.4.4: correção do CSP nonce no resume do PPR (relevante para a política de cabeçalhos); `jsonwebtoken` trocado por `fast-jwt`.
+- 16.4.5: correção de segurança (7 avisos moderados: `use cache`, shells de fallback do Cache Components, respostas em app em servidor próprio, bypass de SVG, cookie HttpOnly no Edge).
+- 16.4.6: compressão automática de respostas de route handlers; ajustes do GC do Turbopack em dev. Nada sobre Server Actions.
+- Nenhuma mudança de API ou depreciação encontrada para `proxy`, Cache Components ou Server Actions.
+
+### Verificação (resultados reais, 25/11/2026)
+
+| Comando | Resultado |
+|---|---|
+| `npm install` | lock atualizado (next/eslint-config-next 16.4.6, zod 4.6.7) |
+| `npm audit --omit=dev` | 0 vulnerabilidades |
+| `npm run lint` | sem erros |
+| `npm run typecheck` | sem erros |
+| `npm test` | 22 arquivos, 290 testes passando (eram 281; 9 novos desta etapa) |
+| `npm run build` | sucesso, 20 páginas (com `.env.local`) |
+| `next build` com `RENDER=true` (variáveis públicas do `.env.local`) sem `APP_ENV` | falha no início: "APP_ENV: obrigatória quando a aplicação roda na Vercel ou no Render" |
+| idem com `APP_ENV=local` | falha: "APP_ENV: o valor 'local' não é permitido no Render (RENDER)" |
+| `render.yaml` e `migrations.yml` | sintaxe YAML validada com `js-yaml` |
+
+Não rodados nesta parte: pgTAP, seed e e2e (sem mudança de banco; a regressão completa com o Supabase local fica para o QA B).
+
+### Divergências e pendências
+
+- D-E9-01: o `vitest` falha com "Cannot read properties of undefined (reading 'config')" quando o diretório corrente do Git Bash vem com `c:` minúsculo (duas instâncias do módulo por causa da caixa da letra do disco). Rodando por PowerShell com `C:\` maiúsculo, passa. É questão do ambiente local; sem mudança de código.
+- D-E9-02: o `zod ^4.6.6` resolveu 4.6.7 (última 4.6.x); a faixa permite as duas.
+- D-E9-03: na Vercel, a mensagem de `APP_ENV` ausente mudou de texto (agora cita Vercel e Render); os testes verificam só `APP_ENV`, então não houve ajuste de asserção.
+- `vercel.json` fica como referência (RAT-D012); sem efeito no Render.
+- Pendências: o responsável cria o serviço pelo Blueprint, informa a URL e a chave publicável no painel, cadastra `RENDER_DEPLOY_HOOK_URL` e dispara o primeiro deploy manual; o workflow segue parado pela cobrança do GitHub. O aviso `install-scripts` do npm (esbuild, unrs-resolver) é do npm atual, sem mudança nesta etapa.
+
+### Handoff
+
+Solicitar revisão de `seguranca` (proteção falhando fechado no Render, `render.yaml` e workflow sem segredos, audit) e de `qa` (build simulando o Render em cópia limpa e regressão completa com o Supabase local).

@@ -45,7 +45,9 @@ Arquivos `.env*` são ignorados pelo git (exceto `.env.example`). Nunca versione
 
 ### Porta e autenticação
 
-A aplicação roda na **porta 3001** (`npm run dev` e `npm run start` usam `-p 3001`). O Supabase local está alinhado a ela em `supabase/config.toml`: `site_url = "http://127.0.0.1:3001"` e `additional_redirect_urls` com `/auth/confirm` em `127.0.0.1` e `localhost` na porta 3001. Se mudar a porta, ajuste os dois e rode `npx supabase stop && npx supabase start` (o Auth só relê o `config.toml` ao reiniciar). Em hospedagem futura (Vercel, RAT-D016), `site_url` e as URLs de redirecionamento passam a ser as do domínio publicado.
+A aplicação roda na **porta 3001** (`npm run dev` e `npm run start` usam `-p 3001`). O Supabase local está alinhado a ela em `supabase/config.toml`: `site_url = "http://127.0.0.1:3001"` e `additional_redirect_urls` com `/auth/confirm` em `127.0.0.1` e `localhost` na porta 3001. Se mudar a porta, ajuste os dois e rode `npx supabase stop && npx supabase start` (o Auth só relê o `config.toml` ao reiniciar). Na hospedagem (**Render**, RAT-D022), o `config.toml` não é usado: o Supabase hospedado é configurado pelo painel (Authentication > URL Configuration). O Site URL é a **raiz** do serviço (`https://<serviço>.onrender.com`, sem caminho, porque os modelos de e-mail já acrescentam `/auth/confirm`) e a única Redirect URL é `https://<serviço>.onrender.com/auth/confirm`, sem curinga e sem `localhost`.
+
+No Render o app sobe com `npm run start:render` (`next start` na porta `PORT` que o Render define; o `npm start` local continua na 3001). O Node 22 é fixado no arquivo `.node-version`, e o serviço é descrito pelo Blueprint `render.yaml` da raiz (região `virginia`, plano free, health check `/login`, deploy automático desligado). `APP_ENV` é obrigatória no Render e `local` é recusado.
 
 Fluxos de autenticação (acesso somente por convite, sem cadastro público):
 
@@ -78,6 +80,7 @@ O `seed:dev` só roda contra o Supabase local: o `hostname` de `NEXT_PUBLIC_SUPA
 | `npm run db:types` | Regenera `src/types/database.types.ts` a partir do banco local. |
 | `npm run dev` | Servidor de desenvolvimento do Next.js na porta 3001. |
 | `npm run start` | Servidor de produção (depois de `npm run build`) na porta 3001. |
+| `npm run start:render` | Servidor de produção na porta `PORT` definida pelo Render (usado só na hospedagem). |
 | `npm test` | Testes unitários (Vitest). Não exigem Supabase nem servidor. |
 | `npm run test:e2e` | Testes de integração e ponta a ponta por HTTP (Vitest + `fetch`, config `vitest.e2e.config.mts`, pasta `tests/e2e/`): comprovantes (E7) e acesso (E8: login, logout, guarda de rota, usuário inativo ou sem papel, auto-cadastro desligado, convite, definir senha e recuperação, com e-mails lidos no Mailpit local). Veja a seção abaixo. |
 | `npm run check:bundle` | CA-12: confere que nenhuma chave secreta do Supabase está em `.next/static` (rode depois do `build`). |
@@ -117,13 +120,17 @@ Para reproduzir localmente na mesma ordem, siga a seção anterior e rode `npm r
 
 ## Publicação (migrations antes do deploy)
 
-O banco hospedado e a Production só mudam por `.github/workflows/migrations.yml`:
+A hospedagem é o **Render** (RAT-D022). O serviço é criado uma vez pelo Blueprint: painel do Render > New > Blueprint > repositório `athrios/financeiro-ultra`; o `render.yaml` da raiz define tudo e o painel pede só `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Nunca cadastre chave secreta do Supabase, `service_role` nem string de conexão, e não cadastre `NODE_VERSION` (vem do `.node-version`). O repositório é público: nenhum segredo, ref do projeto, URL real do serviço ou e-mail real entra em arquivo versionado.
 
-1. Merge na `main` (a CI precisa estar verde). A Vercel **não** publica a `main` sozinha (`vercel.json`: `git.deploymentEnabled.main = false`); Previews de outras branches e PRs seguem automáticos.
-2. O responsável (usuário `athrios`) dispara à mão **Actions > Migrations e publicação em Production** na `main`. O job só roda para esse usuário. A opção "Só simular" executa `supabase db push --dry-run` e para.
-3. O workflow liga o projeto, aplica as migrations (`supabase db push`) e **só depois** chama o deploy hook da Vercel, que publica a Production.
+O **deploy automático está desligado**: nada é publicado ao dar push na `main`. A ordem é sempre migration primeiro, depois o código:
 
-Segredos do GitHub usados (nomes; os valores ficam só no GitHub): `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `SUPABASE_DB_PASSWORD`, `VERCEL_DEPLOY_HOOK_URL`. Nunca rode `supabase config push` com o `config.toml` atual (é do ambiente local). O passo a passo dos painéis está em [`docs/features/FND-001-fundacao/checklist-e9.md`](docs/features/FND-001-fundacao/checklist-e9.md). O primeiro Administrador é criado com `scripts/sql/bootstrap-first-admin.sql` (instruções no próprio arquivo).
+1. Merge na `main`.
+2. Aplicar as migrations pendentes no banco hospedado. Enquanto o GitHub Actions estiver parado (cobrança da conta), o responsável faz isso pelo CLI (`npx supabase link`, `db push --dry-run`, `db push`; veja o checklist). Quando o Actions voltar, o caminho padrão é `.github/workflows/migrations.yml`: o responsável (usuário `athrios`) dispara à mão **Actions > Migrations e publicação em Production** na `main`; a opção "Só simular" executa `supabase db push --dry-run` e para.
+3. Publicar a Production: no painel do Render, **Manual Deploy > Deploy latest commit** (ou o deploy hook do Render). O workflow de migrations, quando voltar, chama esse hook depois do `db push`.
+
+`NEXT_PUBLIC_*` e `APP_ENV` são fixados **no build**: mudar qualquer uma no painel exige novo deploy, não basta reiniciar. Se faltar variável, o build falha logo no início listando o que falta ("Configuração de ambiente inválida"). Reversão: **Rollback** para o deploy anterior no painel do Render, ou revert do commit e novo Manual Deploy (a E9 não tem migration). O plano free dorme depois de cerca de 15 minutos sem uso (o primeiro acesso demora cerca de 1 minuto) e o Render não o recomenda para produção (P-05c2 pendente). O `vercel.json` é **obsoleto**: fica só como referência histórica, sem efeito no Render.
+
+Segredos do GitHub usados pelo workflow (nomes; os valores ficam só no GitHub): `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `SUPABASE_DB_PASSWORD`, `RENDER_DEPLOY_HOOK_URL`. Nunca rode `supabase config push` com o `config.toml` atual (é do ambiente local). O passo a passo dos painéis está em [`docs/features/FND-001-fundacao/checklist-e9.md`](docs/features/FND-001-fundacao/checklist-e9.md). O primeiro Administrador é criado com `scripts/sql/bootstrap-first-admin.sql` (instruções no próprio arquivo).
 
 ## Estrutura
 
@@ -133,7 +140,7 @@ Segredos do GitHub usados (nomes; os valores ficam só no GitHub): `SUPABASE_ACC
 - `src/server/` (sessão, autorização para UX, contexto de requisição) e `src/lib/` (env, erros, logger, redirecionamento seguro, cabeçalhos de segurança, navegação, papéis).
 - `supabase/`: migrations (linha de base de 23/10/2026), seed e testes de banco (pgTAP).
 - `scripts/`: utilitários de desenvolvimento (`seed-dev.ts`, `check-bundle-secrets.ts`) e SQL versionado (`sql/seed-dev-access.sql` do seed local; `sql/bootstrap-first-admin.sql` e `-verify.sql` do primeiro Administrador no ambiente hospedado).
-- `.github/workflows/`: `ci.yml` (verificações) e `migrations.yml` (migrations + publicação de Production, só pelo responsável). `vercel.json`: região das funções e Production sem deploy automático.
+- `.github/workflows/`: `ci.yml` (verificações) e `migrations.yml` (migrations + publicação de Production, só pelo responsável). `render.yaml`: Blueprint do serviço no Render; `.node-version`: Node 22. `vercel.json`: obsoleto, só referência.
 - `docs/legado/07-10/`: referência histórica arquivada (fora do tsc, do ESLint e do Vitest; nunca aplicada).
 
 ## Documentação
