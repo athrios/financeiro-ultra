@@ -1,0 +1,2 @@
+- [Responsável não técnico](responsavel-nao-tecnico.md) — perguntas de G0 em linguagem simples, com recomendação e o que bloqueiam
+- [Hospedagem Vercel não registrada](hospedagem-vercel-nao-registrada.md) — 25/11/2026: Vercel na prática, Render nos docs; sem SMTP, sem CI

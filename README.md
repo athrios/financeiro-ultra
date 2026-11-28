@@ -82,7 +82,7 @@ O `seed:dev` só roda contra o Supabase local: o `hostname` de `NEXT_PUBLIC_SUPA
 | `npm run start` | Servidor de produção (depois de `npm run build`) na porta 3001. |
 | `npm run start:render` | Servidor de produção na porta `PORT` definida pelo Render (usado só na hospedagem). |
 | `npm test` | Testes unitários (Vitest). Não exigem Supabase nem servidor. |
-| `npm run test:e2e` | Testes de integração e ponta a ponta por HTTP (Vitest + `fetch`, config `vitest.e2e.config.mts`, pasta `tests/e2e/`): comprovantes (E7) e acesso (E8: login, logout, guarda de rota, usuário inativo ou sem papel, auto-cadastro desligado, convite, definir senha e recuperação, com e-mails lidos no Mailpit local). Veja a seção abaixo. |
+| `npm run test:e2e` | Testes de integração e ponta a ponta por HTTP (Vitest + `fetch`, config `vitest.e2e.config.mts`, pasta `tests/e2e/`): cadastros da CAD-001 (`cad-partners`, `cad-receivers`, `cad-clients` e `cad-aliases`: páginas por papel, Server Actions permitidas × negadas e os caminhos principais de sócios, recebedores, clientes e apelidos), comprovantes (E7) e acesso (E8: login, logout, guarda de rota, usuário inativo ou sem papel, auto-cadastro desligado, convite, definir senha e recuperação, com e-mails lidos no Mailpit local). Veja a seção abaixo. |
 | `npm run check:bundle` | CA-12: confere que nenhuma chave secreta do Supabase está em `.next/static` (rode depois do `build`). |
 | `npm run lint` | ESLint. |
 | `npm run typecheck` | Gera os tipos de rota do Next e roda `tsc --noEmit`. |
@@ -105,7 +105,8 @@ DEV_SEED_PASSWORD=<a-mesma-senha> npm run test:e2e
 - Variáveis lidas do ambiente ou do `.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `DEV_SEED_PASSWORD`. Opcionais: `E2E_BASE_URL` (padrão `http://127.0.0.1:3001`) e `E2E_MAILPIT_URL`.
 - Os testes de convite precisam da chave secreta do Supabase **local** (`SECRET_KEY` de `npx supabase status -o env`) para convidar o usuário pela API administrativa, como o painel faz no ambiente hospedado. Ela vem de `E2E_SUPABASE_SECRET_KEY` ou do `SUPABASE_SECRET_KEY` do `.env.local`. A aplicação nunca lê essa chave.
 - O `npm test` continua sem exigir Supabase nem servidor.
-- Os testes deixam usuários e comprovantes fictícios no banco local; `npm run db:reset` limpa.
+- Os testes deixam usuários, comprovantes, sócios, recebedores e clientes fictícios no banco local (não há exclusão; os nomes levam um sufixo único por execução, então repetir a execução funciona); `npm run db:reset` limpa.
+- As sessões dos papéis (Administrador, Operador, Visualizador e Sócio) são abertas uma vez no `global-setup` e repassadas aos testes da CAD, para não estourar o limite de 30 logins por 5 minutos do Supabase local.
 
 ## Integração contínua (CI)
 

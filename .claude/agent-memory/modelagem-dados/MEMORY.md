@@ -1,2 +1,3 @@
 - [Restrições do workflow](project_restricoes-workflow.md) — nunca ler .acessos/; sem git/remotos; Brain e 01-plano só leitura
 - [Modelagem FND-001](project_modelagem-fnd-001.md) — rev. 4 sincronizada com migrations; motivo opcional (RAT-D021); M-01..M-05
+- [Modelagem CAD-001](project_modelagem-cad-001.md) — save_* tudo ou nada, DEFINER em private, numeric(14,2); rev. 4 = tetos RAT-D026 no banco (cad_list_limit)

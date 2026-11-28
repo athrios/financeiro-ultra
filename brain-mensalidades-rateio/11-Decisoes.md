@@ -170,6 +170,8 @@ Os termos do código de 07/10 ("Indicador", "Empresa") não serão usados.
 
 Origem: responsável pelo produto, 22/10/2026 (FND-001, P-04b): "Parte deve ser chamado de Sócio, os demais pode manter".
 
+> **Complemento (26/11/2026, CAD-001):** o tipo do cliente aparece na tela só como o tipo do documento, **"CPF" ou "CNPJ"**. Não se usa "Pessoa física", "Pessoa jurídica" nem "Empresa". Cliente sem documento fica sem tipo. Resposta escolhida pelo responsável: "Só 'CPF' / 'CNPJ'".
+
 ---
 
 ## RAT-D018 — Região do banco
@@ -222,6 +224,95 @@ Origem: responsável pelo produto, 24/11/2026 (FND-001, E9): "mudei de provedor.
 
 ---
 
+## RAT-D023 — Recebedor sempre ligado a um sócio
+
+Todo **recebedor** pertence a um **sócio**. Um sócio pode ter vários recebedores, como contas, nomes bancários ou titulares ([[02-Dominio#Recebedor]]). Não existe recebedor de terceiro nem intermediário.
+
+O cadastro de recebedores entra junto com os de sócios e clientes (CAD-001), antes do módulo de Recebimentos.
+
+**Dados do recebedor:** o nome do titular é obrigatório. Os dados abaixo são opcionais e servem para reconhecer quem recebeu nos comprovantes ([[08-Importacao-e-Leitura-de-Comprovantes]]):
+- variações do nome;
+- chave Pix;
+- banco, agência e conta.
+
+O CPF ou CNPJ do titular **não** é guardado como documento. A **chave Pix** pode ser um CPF ou CNPJ; nesse caso, ele fica guardado só como chave Pix.
+
+Quem tem acesso de leitura vê os documentos dos clientes e as chaves Pix **completos**, sem máscara (uso interno, [[#RAT-D020 — Postura de segurança para uso interno]]).
+
+Responde à pendência P-08.
+
+Origem: responsável pelo produto, 25/11/2026 (CAD-001, G0). Respostas escolhidas:
+- "Sim, agora": os recebedores entram nesta feature;
+- "Sempre um sócio": o recebedor pertence a um sócio;
+- "Chave Pix, Variações do nome, Banco, agência e conta": dados do recebedor. O "CPF/CNPJ do titular", também oferecido, não foi escolhido.
+- "Aceitar como chave Pix": a chave Pix pode ser CPF ou CNPJ.
+- "Ver completo": nenhum dado é mascarado para Operador e Visualizador.
+
+---
+
+## RAT-D024 — Documento do cliente
+
+O cliente pode ser **pessoa física (CPF)** ou **empresa (CNPJ)**. Revisa [[02-Dominio#Cliente]], que o definia só como empresa.
+
+- O documento é **opcional**. Um cliente sem documento é identificado pelo nome.
+- Quando informado, o documento **não pode se repetir** em outro cliente.
+- O CNPJ é aceito nos dois formatos: o numérico e o **alfanumérico**, emitido desde julho de 2026. Responde à pendência P-13 do plano da FND-001.
+- **Aviso de possível cliente duplicado:** o aviso não bloqueia; quem está salvando pode confirmar e seguir. Ao salvar um cliente, com ou sem documento (o aviso é mais útil para quem não tem), ele aparece em dois casos:
+  - já existe outro cliente, ativo ou inativo, com o **mesmo nome** depois de normalizado, ou com um apelido ativo igual a esse nome. Regra R-C15 do plano da CAD-001;
+  - um **apelido** do cliente é igual ao nome ou ao nome fantasia de outro cliente.
+
+Origem: responsável pelo produto, 25/11/2026 (CAD-001, G0). Respostas escolhidas:
+- "Sim, os dois formatos";
+- "CNPJ ou CPF";
+- "Opcional";
+- "Não pode repetir".
+
+A unicidade vale também contra clientes inativos: um cliente que volta é reativado. Essa leitura é do orquestrador e foi apresentada ao responsável.
+
+O aviso por apelido foi confirmado pelo responsável em 26/11/2026 (CAD-001, implementação): "sim", em resposta à pergunta se um apelido de cliente igual ao nome de outro cliente deve gerar o aviso de possível duplicado.
+
+Na mesma data, o responsável confirmou a redação do aviso: escolheu "O do plano/código", com o aviso para qualquer cliente com o mesmo nome normalizado, com ou sem documento, e o nome fantasia contando como nome. Isso corrigiu uma primeira redação do orquestrador, que restringia o aviso a clientes sem documento.
+
+---
+
+## RAT-D025 — Regras do cadastro de sócios e clientes
+
+- **Inativação do sócio:**
+  - Um sócio indicado em qualquer cliente, **ativo ou inativo**, não pode ser inativado. Primeiro ele é retirado desses clientes; o sistema mostra a lista. Assim, um cliente reativado nunca volta com um sócio inativo.
+  - Os recebedores ativos do sócio são inativados **junto** com ele: o sistema mostra a lista e pede confirmação.
+- **Cliente ativo sempre tem sócio:** pelo menos um sócio indicado.
+- **Mensalidade obrigatória:** o valor padrão da mensalidade é obrigatório, maior que zero e editável.
+- **Troca de sócios de um cliente:** vale **a partir do momento da alteração**. O que já foi recebido não muda ([[#RAT-D006 — Snapshot do rateio]]), e a troca fica na auditoria ([[#RAT-D009 — Auditoria obrigatória]]).
+- **Sem documento do sócio:** o sócio não guarda CPF nem CNPJ, só nome e apelidos, para guardar menos dado pessoal.
+
+Origem: responsável pelo produto, 25/11/2026 (CAD-001, G0). Em todos os itens, o responsável escolheu a recomendação do plano:
+- "Não, retirar antes";
+- "Sim, maior que zero";
+- "A partir de agora";
+- "Não, só nome e apelidos";
+- "Sim, sai de todos": a retirada vale também para os clientes inativos;
+- "Inativar junto": os recebedores são inativados com o sócio.
+
+---
+
+## RAT-D026 — Limites de itens por cadastro
+
+- **Sócio:** até 2 apelidos ativos.
+- **Cliente:** até 2 apelidos ativos do tipo nome e até 2 do tipo documento (CPF ou CNPJ). Cada tipo tem o próprio limite.
+- **Recebedor:** até 30 variações do nome, 10 chaves Pix e 10 contas bancárias ativas.
+- **Contam só os itens ativos.** O cadastro não apaga itens, só os inativa. Numa lista cheia, para incluir ou reativar um item é preciso antes inativar outro.
+
+Contexto: na validação da CAD-001 (QA-CAD-07), listas com milhares de itens estouravam o tempo limite do banco. O desenvolvedor propôs limites técnicos de proteção (50 apelidos por sócio, 50 por cliente, 50 variações do nome, 20 chaves Pix e 20 contas). O responsável fixou os números acima, que passam a ser regra do cadastro.
+
+Origem: responsável pelo produto, 27/11/2026 (CAD-001, E10):
+- "2 apelidos por sócio / 2 apelidos por cliente / 30 variações de nome por recebedor / 10 chaves pix por recebedor / 10 contas por recebedor";
+- "2 nomes e 2 documentos", sobre a contagem dos apelidos do cliente;
+- "Plano e Brain", sobre onde registrar a regra.
+
+A contagem só dos itens ativos é leitura do orquestrador, porque o cadastro não apaga itens; foi apresentada ao responsável junto com o registro desta decisão.
+
+---
+
 ## Decisões pendentes
 
 - **P-02b** — Escopo de acesso dos sócios com login próprio ([[#RAT-D011 — Perfis de acesso]]).
@@ -229,7 +320,6 @@ Origem: responsável pelo produto, 24/11/2026 (FND-001, E9): "mudei de provedor.
 - **P-24** — Gestão de usuários pela aplicação (exige a chave secreta no servidor) ou pelo painel do Supabase?
 - **P-25** — Provedor de SMTP para os e-mails de convite e de recuperação de senha, e domínio da aplicação.
 - **P-26** — Com a aplicação no Render em Virginia (EUA) ([[#RAT-D022 — Hospedagem no Render]]), os dados pessoais passam por servidor fora do Brasil, embora o banco fique em São Paulo. Avaliar a LGPD (transferência internacional) antes de entrarem dados reais.
-- **P-08** — Recebedor será sempre uma Parte ou poderá existir recebedor intermediário?
 - **P-10** — Um cliente poderá ter mais de uma mensalidade na mesma competência?
 - **P-09** — Será permitido recebimento parcial?
 - **P-11** — Será permitido estorno?

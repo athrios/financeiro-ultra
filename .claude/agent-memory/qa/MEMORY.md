@@ -1,0 +1,1 @@
+- [Sondagens HTTP da CAD-001](project_cad001-qa-probes.md) — como rodar scripts tsx contra o next start local e armadilhas (vitest, file:///, .mts)

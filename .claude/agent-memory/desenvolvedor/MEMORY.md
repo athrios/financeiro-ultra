@@ -3,3 +3,17 @@
 - [Correções E4/E5 (amr, PPR sem JS, sidebar, legado)](project_fnd001-correcoes-e4e5.md) — armadilhas da rodada pós-validação
 - [Armadilhas da E7 (upload, e2e HTTP, corpo do Next)](project_fnd001-e7-gotchas.md) — limite de corpo no handler, DEV_SEED_PASSWORD, pgTAP com dados reais
 - [Armadilhas da E8 (smoke HTTP, CI, workflows, db query)](project_fnd001-e8-gotchas.md) — pages.ts sem JS, keep-alive, db query 1 instrução, -x do supabase start
+- [Armadilhas da CAD-001 E3a (triggers, pgTAP, CLI)](project_cad001-e3a-gotchas.md) — case com new.campo, helpers err_of/i01_of, docker psql por stdin
+- [Armadilhas da CAD-001 E3a parte 2 (RPCs, pgTAP)](project_cad001-e3b-rpc-gotchas.md) — now() da transação, fixtures com updated_at antigo, auditoria por correlation_id, concorrência à mão
+- [Armadilhas da CAD-001 E3b (clientes, seed, concorrência)](project_cad001-e3b-clientes-gotchas.md) — seed no banco de teste, now() da transação, CA-07 só com update direto
+- [Armadilhas da CAD-001 E5b (recebedores)](project_cad001-e5b-gotchas.md) — IDENTIFIER_TAKEN na 0200, heredoc quebra, vitest só pelo PowerShell
+- [Armadilhas da CAD-001 E5a (HTTP sem navegador)](project_cad001-e5a-http-gotchas.md) — seed:dev com senha nova, form sintético de ação, form 'Sair' armadilha
+- [Armadilhas da CAD-001 E6a (lista/detalhe de clientes)](project_cad001-e6a-gotchas.md) — search_clients com 5 args, SAME_ALIAS, guardAdminPage, plan do pgTAP
+- [Armadilhas da CAD-001 E6b (formulário de cliente)](project_cad001-e6b-gotchas.md) — aliasType/aliasValue paralelos, diálogo fora do form, lint de refs, FormData em teste
+- [Armadilhas da CAD-001 E6c p1 (inativar cliente)](project_cad001-e6c-gotchas.md) — campos do POST, hint do bloqueio, ordem revalidar/redirect em teste
+- [Armadilhas da CAD-001 E6c p2 (HTTP de Clientes)](project_cad001-e6c2-http-gotchas.md) — senha só por env, redirect PPR é meta refresh, versão do sócio em /editar
+- [Armadilhas da CAD-001 E7 p1 (Apelidos)](project_cad001-e7a-gotchas.md) — contar linhas no HTML PPR, node com caminho MSYS, ListPagination
+- [Armadilhas da CAD-001 E7 p2 (e2e permanentes)](project_cad001-e7b-gotchas.md) — sessões por provide, listas que crescem, eco da busca, CRLF
+- [Armadilhas da CAD-001 E10 (aplicação)](project_cad001-e10-app-gotchas.md) — limits.ts, índice bruto no recebedor, documentType em CLIENT_FORM_FIELDS, NUL
+- [Armadilhas da CAD-001 E10 (e2e permanentes)](project_cad001-e10-tests-gotchas.md) — errorOf com chaves aninhadas, CONFLICT x STALE_VERSION, paginação, concorrência
+- [Armadilhas da CAD-001 E10 r4 (verificação)](project_cad001-e10-r4-verify-gotchas.md) — script e2e em segundo plano, timeout recorrente do teste de acesso, heredoc

@@ -1,2 +1,3 @@
 - [Triagem E0 FND-001](project_fnd001-triagem-e0.md) — audit residual dev-only (braces (resolvido em 23/10)), RAT-D019 vale para docs, .env.local nao legivel
 - [Revisao E4+E5+E8b+E9b FND-001](project_fnd001-revisao-e4-e5.md) — E9b 25/11 liberado (Render, repo publico aceito); cobrar evidencias dos paineis SEG-E9B-08
+- [Revisao CAD-001 G4](project_cad001-revisao.md) — rodada 4c LIBERADO; convencao de dado de teste SEG-CAD-15; nunca numero por extenso no 05/memoria
