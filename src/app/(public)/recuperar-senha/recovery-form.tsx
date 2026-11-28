@@ -4,7 +4,7 @@ import { Loader2, Mail } from "lucide-react";
 import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 
-import { FieldError } from "@/components/auth/field-error";
+import { FieldError } from "@/components/form/field-error";
 import { FormMessage } from "@/components/auth/form-message";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

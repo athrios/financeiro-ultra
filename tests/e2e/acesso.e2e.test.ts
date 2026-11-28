@@ -111,7 +111,8 @@ describe("acesso por situação do usuário", () => {
   afterAll(() => {
     // Devolve o Operador do seed ao estado ativo, mesmo se um teste falhar no meio.
     setUserAccess("operator", "OPERATOR", true);
-  });
+    // Tempo próprio de 90 s: setUserAccess roda `supabase db query` (cerca de 10 s com a máquina ocupada, mais no Windows), acima do hookTimeout global de 30 s.
+  }, 90_000);
 
   it("usuário sem papel entra, mas só vê 'Sem acesso ativo' em qualquer rota, sem menu nem módulos", async () => {
     const jar = new CookieJar();
@@ -159,7 +160,8 @@ describe("acesso por situação do usuário", () => {
 
     setUserAccess("operator", "OPERATOR", true);
     expect((await followPage(jar, "/")).text).not.toContain("Sem acesso ativo");
-  });
+    // Tempo próprio de 90 s: cada setUserAccess roda `supabase db query` (cerca de 10 s com a máquina ocupada), duas vezes aqui.
+  }, 90_000);
 });
 
 describe("auto-cadastro desligado", () => {

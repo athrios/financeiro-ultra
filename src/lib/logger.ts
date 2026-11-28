@@ -5,7 +5,7 @@ import { LOG_LEVELS, type LogLevel } from "./env";
  *
  * Segurança (plano, seção 12): segredos, tokens, CPF e dados bancários nunca saem em log.
  *  - redação por NOME de campo (senha, token, cookie, chave, cpf, conta, agência, pix...);
- *  - redação por CONTEÚDO em qualquer texto (JWT, "Bearer ...", CPF, e-mail, chave secreta);
+ *  - redação por CONTEÚDO em qualquer texto (JWT, "Bearer ...", CPF, CNPJ, e-mail, chave secreta);
  *  - profundidade e tamanho limitados; referências circulares tratadas.
  *
  * Auditoria de negócio NÃO é log: ela fica no banco (RAT-D009). Isto é só o log técnico.
@@ -41,6 +41,9 @@ const SENSITIVE_WORDS = new Set([
   "session",
   "sessao",
   "cpf",
+  "cnpj",
+  "document",
+  "documento",
   "rg",
   "agencia",
   "agency",
@@ -80,6 +83,13 @@ const BEARER_PATTERN = /\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi;
 const SUPABASE_KEY_PATTERN = /\bsb_(?:secret|publishable)_[A-Za-z0-9_-]{6,}/g;
 const CPF_FORMATTED_PATTERN = /\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/g;
 const CPF_BARE_PATTERN = /(?<![\d.])\d{11}(?![\d.])/g;
+/**
+ * CNPJ (SEG-CAD-01), numérico e alfanumérico (12 letras ou números + 2 dígitos verificadores), com e sem
+ * máscara. O sem máscara exige 14 caracteres corridos, sem letra ou número colado antes ou depois: UUID
+ * (grupos separados por hífen, o maior com 12) e ids comuns não casam.
+ */
+const CNPJ_FORMATTED_PATTERN = /(?<![A-Za-z0-9])[0-9A-Za-z]{2}\.[0-9A-Za-z]{3}\.[0-9A-Za-z]{3}\/[0-9A-Za-z]{4}-\d{2}(?![A-Za-z0-9])/g;
+const CNPJ_BARE_PATTERN = /(?<![A-Za-z0-9])[0-9A-Za-z]{12}\d{2}(?![A-Za-z0-9])/g;
 const EMAIL_PATTERN = /\b([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]*@([A-Za-z0-9.-]+\.[A-Za-z]{2,})\b/g;
 const URL_SECRET_PARAM_PATTERN = /([?&#](?:token_hash|token|access_token|refresh_token|code|apikey|key|password)=)[^&#\s]+/gi;
 
@@ -103,6 +113,8 @@ export function redactString(value: string): string {
     .replace(SECRET_PAIR_PATTERN, `$1$2${REDACTED}`)
     .replace(SUPABASE_KEY_PATTERN, REDACTED)
     .replace(URL_SECRET_PARAM_PATTERN, `$1${REDACTED}`)
+    .replace(CNPJ_FORMATTED_PATTERN, REDACTED)
+    .replace(CNPJ_BARE_PATTERN, REDACTED)
     .replace(CPF_FORMATTED_PATTERN, REDACTED)
     .replace(CPF_BARE_PATTERN, REDACTED)
     .replace(EMAIL_PATTERN, "$1***@$2");

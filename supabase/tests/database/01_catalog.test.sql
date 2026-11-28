@@ -24,8 +24,8 @@ select is(
 select cmp_ok(
   (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind in ('r', 'p')),
-  '>=', 4::bigint,
-  'O catálogo enxerga as tabelas da FND (partners, profiles, audit_logs, proof_files)');
+  '>=', 10::bigint,
+  'O catálogo enxerga as tabelas da FND (partners, profiles, audit_logs, proof_files) e as seis da CAD-001');
 
 select is(
   (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -77,8 +77,12 @@ select is(
 select set_eq(
   $$select p.proname::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')$$,
-  $$values ('register_proof_file'::text), ('complete_proof_file_upload')$$,
-  'authenticated executa em public somente as duas RPCs de comprovante (lista explícita)');
+  $$values ('register_proof_file'::text), ('complete_proof_file_upload'),
+           -- CAD-001 (migrations 0300 e 0400): invólucros SECURITY INVOKER de escrita (sócio, recebedor, cliente) e as
+           -- duas buscas SECURITY INVOKER (modelagem 6.1, 6.4.7 e 7.2): as oito da 12.1.
+           ('save_partner'), ('set_partner_active'), ('save_receiver'), ('set_receiver_active'),
+           ('save_client'), ('set_client_active'), ('search_clients'), ('search_aliases')$$,
+  'authenticated executa em public somente as RPCs de comprovante e as oito de cadastro (lista explícita)');
 
 select is(
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -123,8 +127,13 @@ select set_eq(
      where n.nspname = 'private' and has_function_privilege('authenticated', p.oid, 'execute')$$,
   $$values ('audit_event'::text), ('set_audit_context'), ('has_role'), ('is_admin'),
            ('can_operate'), ('can_read_business'), ('current_partner_id'), ('proof_upload_allowed'),
-           ('proof_readable'), ('normalize_alias')$$,
-  'authenticated executa em private somente a lista explícita (RLS, RPCs invoker e coluna gerada)');
+           ('proof_readable'), ('normalize_alias'),
+           -- CAD-001 (migration 0100): funções de documento usadas em CHECK e em search_clients (modelagem 7.2).
+           ('normalize_document'), ('is_valid_cpf'), ('is_valid_cnpj'), ('is_valid_document'),
+           -- CAD-001 (migrations 0300 e 0400): as seis implementações de escrita (sócio, recebedor e cliente).
+           ('save_partner'), ('set_partner_active'), ('save_receiver'), ('set_receiver_active'),
+           ('save_client'), ('set_client_active')$$,
+  'authenticated executa em private somente a lista explícita (RLS, RPCs invoker, coluna gerada e documentos)');
 
 -- -----------------------------------------------------------------------------
 -- Tipos monetários e percentuais (I-17 · CA-11 · I-37)
@@ -190,8 +199,8 @@ select set_eq(
 select is(
   (select count(distinct t.tgrelid) from pg_trigger t
     where t.tgfoid = 'private.audit_row_change'::regproc and not t.tgisinternal),
-  3::bigint,
-  'Três tabelas auditadas na FND: partners, profiles, proof_files');
+  9::bigint,
+  'Nove tabelas auditadas: as três da FND (partners, profiles, proof_files) e as seis da CAD-001');
 
 select is(
   (select coalesce(string_agg(t.tgrelid::regclass::text, ', '), '')

@@ -5,7 +5,7 @@ import { createLogger, isSensitiveKey, redact, redactString, REDACTED, type LogS
 // Valores fictícios (RAT-D019). Os "segredos" abaixo são inventados.
 const FAKE_JWT = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTYifQ.c2lnbmF0dXJhX2ZpY3RpY2lh";
 const FAKE_SECRET_KEY = "sb_secret_abcdefghijklmnop";
-const FAKE_CPF = "123.456.789-09";
+const FAKE_CPF = "000.000.004-34";
 
 function capture() {
   const lines: Array<{ level: string; parsed: Record<string, unknown>; raw: string }> = [];
@@ -49,13 +49,13 @@ describe("isSensitiveKey", () => {
 
 describe("redactString", () => {
   it("redige JWT, Bearer, chave secreta e CPF", () => {
-    const text = `falhou com ${FAKE_JWT} e Bearer abcdefgh12345678 chave ${FAKE_SECRET_KEY} cpf ${FAKE_CPF} ou 12345678909`;
+    const text = `falhou com ${FAKE_JWT} e Bearer abcdefgh12345678 chave ${FAKE_SECRET_KEY} cpf ${FAKE_CPF} ou 00000000434`;
     const result = redactString(text);
     expect(result).not.toContain(FAKE_JWT);
     expect(result).not.toContain("abcdefgh12345678");
     expect(result).not.toContain(FAKE_SECRET_KEY);
     expect(result).not.toContain(FAKE_CPF);
-    expect(result).not.toContain("12345678909");
+    expect(result).not.toContain("00000000434");
     expect(result).toContain(REDACTED);
   });
 
@@ -102,7 +102,7 @@ describe("redactString", () => {
   });
 
   it("mascara e-mails mantendo só a inicial e o domínio", () => {
-    expect(redactString("usuario@exemplo.com falhou")).toBe("u***@exemplo.com falhou");
+    expect(redactString("usuario@example.com falhou")).toBe("u***@example.com falhou");
   });
 
   it("não altera texto comum nem números de outros tamanhos", () => {
@@ -221,5 +221,44 @@ describe("createLogger", () => {
   it("usa console.error para erros e console.warn para avisos quando não há sink", () => {
     const logger = createLogger({ level: "debug", now: fixedNow });
     expect(() => logger.debug("teste de console")).not.toThrow();
+  });
+});
+
+describe("CNPJ no log (SEG-CAD-01)", () => {
+  const NUMERIC = "99.999.999/0002-72";
+  const NUMERIC_BARE = "99999999000272";
+  const ALPHA = "12.ABC.345/01DE-35";
+  const ALPHA_BARE = "12ABC34501DE35";
+  const ALPHA_LOWER = "12abc34501de35";
+
+  it.each([NUMERIC, NUMERIC_BARE, ALPHA, ALPHA_BARE, ALPHA_LOWER])("redige o CNPJ %s dentro de um texto", (cnpj) => {
+    const result = redactString(`Key (document)=(${cnpj}) already exists; dono ${cnpj}.`);
+    expect(result).not.toContain(cnpj);
+    expect(result).toContain(REDACTED);
+  });
+
+  it("não redige UUID, id comum nem texto curto (ids não são dado pessoal)", () => {
+    const uuid = "6f1d7a4e-0b1c-4d2e-8f3a-9b8c7d6e5f40";
+    const text = `id ${uuid} operation cadastros.save_client request abcdefghijkl12345`;
+    expect(redactString(text)).toBe(text);
+  });
+
+  it("redige o campo document, documento e cnpj pelo nome, mesmo sem padrão no valor", () => {
+    expect(isSensitiveKey("document")).toBe(true);
+    expect(isSensitiveKey("documento")).toBe(true);
+    expect(isSensitiveKey("cnpj")).toBe(true);
+    expect(redact({ document: "qualquer", documento: "x", cnpj: "y", id: "ok" })).toEqual({
+      document: REDACTED,
+      documento: REDACTED,
+      cnpj: REDACTED,
+      id: "ok",
+    });
+  });
+
+  it("o CNPJ numérico dentro de um objeto de log sai redigido na linha inteira", () => {
+    const { lines, sink } = capture();
+    const logger = createLogger({ level: "info", sink, now: fixedNow });
+    logger.error("falha", { cause: { message: `valor ${NUMERIC_BARE} e ${ALPHA}`, details: { document: NUMERIC_BARE } } });
+    for (const leaked of [NUMERIC, NUMERIC_BARE, ALPHA, ALPHA_BARE]) expect(lines[0].raw).not.toContain(leaked);
   });
 });

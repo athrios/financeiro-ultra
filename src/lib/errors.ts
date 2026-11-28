@@ -9,6 +9,15 @@
  * - Erro desconhecido vira mensagem genérica (o chamador registra no log com o correlation_id).
  */
 
+import {
+  mapCadastroError,
+  type CadastroErrorDetails,
+  type CadastroHint,
+  type DatabaseErrorContext,
+} from "./cadastro-errors";
+
+export type { CadastroErrorDetails, CadastroHint, DatabaseErrorContext } from "./cadastro-errors";
+
 export const APP_ERROR_CODES = [
   "VALIDATION", // dado informado não atende a uma regra (22023, 23514)
   "CONFLICT", // já existe (23505)
@@ -39,17 +48,25 @@ export interface AppErrorOptions {
   message?: string;
   /** Erro original. Só para log; nunca exibido. */
   cause?: unknown;
+  /** Chave estável do erro do banco (contrato 6.3 da CAD-001), quando houver. */
+  hint?: CadastroHint;
+  /** Dados estruturados que a tela usa junto com a mensagem (dono do documento, lista de clientes...). */
+  details?: CadastroErrorDetails;
 }
 
 export class AppError extends Error {
   readonly code: AppErrorCode;
   readonly field?: string;
+  readonly hint?: CadastroHint;
+  readonly details?: CadastroErrorDetails;
 
   constructor(code: AppErrorCode, options: AppErrorOptions = {}) {
     super(options.message ?? APP_ERROR_MESSAGES[code], { cause: options.cause });
     this.name = "AppError";
     this.code = code;
     this.field = options.field;
+    this.hint = options.hint;
+    this.details = options.details;
   }
 }
 
@@ -58,6 +75,10 @@ export interface ActionError {
   code: AppErrorCode;
   message: string;
   field?: string;
+  /** Chave estável do erro (ex.: "STALE_VERSION", "POSSIBLE_DUPLICATE"); só quando o banco informou. */
+  hint?: CadastroHint;
+  /** Dados estruturados do erro, serializáveis (Server Action -> tela). */
+  details?: CadastroErrorDetails;
 }
 
 export type ActionResult<T> = { ok: true; data: T } | { ok: false; error: ActionError };
@@ -67,8 +88,12 @@ export function ok<T>(data: T): ActionResult<T> {
 }
 
 export function fail(error: AppError | ActionError): { ok: false; error: ActionError } {
-  const { code, message, field } = error;
-  return { ok: false, error: field === undefined ? { code, message } : { code, message, field } };
+  const { code, message, field, hint, details } = error;
+  const result: ActionError = { code, message };
+  if (field !== undefined) result.field = field;
+  if (hint !== undefined) result.hint = hint;
+  if (details !== undefined) result.details = details;
+  return { ok: false, error: result };
 }
 
 /** Forma mínima de erro do PostgREST / supabase-js / driver do Postgres. */
@@ -96,19 +121,38 @@ export function isDatabaseErrorLike(value: unknown): value is DatabaseErrorLike 
 }
 
 /**
- * Converte um erro do banco em AppError. Erros desconhecidos viram UNEXPECTED
- * (mensagem genérica); o original fica em `cause` para o log.
+ * Converte um erro do banco em AppError.
+ *
+ * 1. Com `hint` do contrato dos cadastros (CAD-001, 6.3) e SQLSTATE coerente, a mensagem, o campo
+ *    e os dados estruturados vêm de `cadastro-errors.ts` (texto fixo em pt-BR).
+ * 2. Senão, vale o mapa por SQLSTATE (comportamento original da FND), com a mensagem padrão.
+ * 3. Erros desconhecidos viram UNEXPECTED (mensagem genérica).
+ *
+ * O original fica sempre em `cause`, só para o log. `context` é opcional: o que quem chama sabe
+ * e o banco não diz (tipo do documento, nome do sócio...).
  */
-export function mapDatabaseError(error: unknown): AppError {
+export function mapDatabaseError(error: unknown, context?: DatabaseErrorContext): AppError {
   if (error instanceof AppError) return error;
-  if (isDatabaseErrorLike(error) && typeof error.code === "string") {
-    const mapped = SQLSTATE_TO_CODE[error.code];
-    if (mapped) return new AppError(mapped, { cause: error });
+  if (isDatabaseErrorLike(error)) {
+    const cadastro = mapCadastroError(error, context);
+    if (cadastro) {
+      return new AppError(cadastro.code, {
+        cause: error,
+        message: cadastro.message,
+        field: cadastro.field,
+        hint: cadastro.hint,
+        details: cadastro.details,
+      });
+    }
+    if (typeof error.code === "string") {
+      const mapped = SQLSTATE_TO_CODE[error.code];
+      if (mapped) return new AppError(mapped, { cause: error });
+    }
   }
   return new AppError("UNEXPECTED", { cause: error });
 }
 
 /** Qualquer valor lançado -> AppError (para o catch de borda). */
-export function toAppError(error: unknown): AppError {
-  return error instanceof AppError ? error : mapDatabaseError(error);
+export function toAppError(error: unknown, context?: DatabaseErrorContext): AppError {
+  return error instanceof AppError ? error : mapDatabaseError(error, context);
 }

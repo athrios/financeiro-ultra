@@ -15,6 +15,10 @@ export class CookieJar {
     return [...this.cookies].map(([name, value]) => `${name}=${value}`).join("; ");
   }
 
+  get(name: string): string | undefined {
+    return this.cookies.get(name);
+  }
+
   names(): string[] {
     return [...this.cookies.keys()];
   }

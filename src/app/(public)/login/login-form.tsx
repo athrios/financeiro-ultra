@@ -4,7 +4,7 @@ import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useActionState, type ReactNode } from "react";
 
-import { FieldError } from "@/components/auth/field-error";
+import { FieldError } from "@/components/form/field-error";
 import { FormMessage } from "@/components/auth/form-message";
 import { PasswordField } from "@/components/auth/password-field";
 import { Button } from "@/components/ui/button";

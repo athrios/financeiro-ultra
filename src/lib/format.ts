@@ -11,11 +11,8 @@ export function formatCurrency(value: Cents): string {
   return currencyFormatter.format(toMoneyString(value) as Intl.StringNumericLiteral);
 }
 
-/** "11222333000181" -> "11.222.333/0001-81" */
-export function formatCnpj(normalizedCnpj: string): string {
-  const match = /^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/.exec(normalizedCnpj);
-  return match ? `${match[1]}.${match[2]}.${match[3]}/${match[4]}-${match[5]}` : normalizedCnpj;
-}
+/** "99999999000272" -> "99.999.999/0002-72"; aceita também o CNPJ alfanumérico ("12ABC34501DE35" -> "12.ABC.345/01DE-35"). */
+export { formatCnpj, formatCpf, formatDocument } from "@/domain/documents/document";
 
 /** 500000 -> "50%" · 333333 -> "33,3333%" · 125000 -> "12,5%" */
 export function formatPercentage(value: PercentUnits): string {

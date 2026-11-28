@@ -143,7 +143,8 @@ describe("splitEqually (valor pela fração exata)", () => {
         expect(part).toBeLessThanOrEqual(Math.ceil(total / n));
       }
     }
-  });
+    // N-04: tempo limite próprio (30 s); com a máquina ocupada, o padrão de 5 s estourava sem erro de lógica.
+  }, 30_000);
 
   it("rejeita entradas inválidas", () => {
     expect(() => splitEqually(parseMoney("10.00"), [], "rec-1")).toThrow(/ao menos um sócio/);

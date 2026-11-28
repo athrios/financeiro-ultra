@@ -275,7 +275,8 @@ describe("upload · papéis", () => {
 
     const again = await upload(sessions.operator, { name: "volta.pdf", type: "application/pdf", bytes: makePdf() });
     expect(ok(again).duplicate).toBe(false);
-  });
+    // Tempo próprio de 90 s: cada setUserAccess roda `supabase db query` (cerca de 10 s com a máquina ocupada), duas vezes aqui.
+  }, 90_000);
 });
 
 describe("leitura · URL assinada", () => {

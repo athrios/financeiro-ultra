@@ -1,10 +1,13 @@
+import type { TestProject } from "vitest/node";
+
+import { signInAllRoles } from "./cad-sessions";
 import { e2eEnv, isLocalUrl } from "./env";
 
 /**
  * Antes de qualquer teste: confere a configuração e se o servidor e o Supabase local estão no ar.
  * Falha com uma mensagem clara em vez de uma pilha de erros de conexão.
  */
-export default async function setup(): Promise<void> {
+export default async function setup(project: TestProject): Promise<void> {
   const env = e2eEnv();
   const problems: string[] = [];
 
@@ -35,4 +38,7 @@ export default async function setup(): Promise<void> {
   if (problems.length > 0) {
     throw new Error(`Ambiente dos testes de integração incompleto:\n - ${problems.join("\n - ")}`);
   }
+
+  // Uma entrada por papel para toda a execução (e2e da CAD-001; veja cad-sessions.ts).
+  project.provide("cadSessions", await signInAllRoles());
 }

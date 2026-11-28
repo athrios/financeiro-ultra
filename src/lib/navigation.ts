@@ -123,8 +123,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon: "users",
     section: "cadastros",
     roles: ALL_BUT_PARTNER,
-    available: false,
-    description: "Cadastro de clientes e dos sócios participantes de cada um.",
+    available: true,
+    description: "Cadastro de clientes, com documento, mensalidade e sócios.",
   },
   {
     label: "Sócios",
@@ -132,8 +132,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon: "handshake",
     section: "configuracoes",
     roles: ADMIN_ONLY,
-    available: false,
-    description: "Cadastro de sócios e de seus aliases.",
+    available: true,
+    description: "Cadastro de sócios, seus recebedores e apelidos.",
   },
   {
     label: "Usuários",
@@ -145,13 +145,15 @@ export const NAV_ITEMS: readonly NavItem[] = [
     description: "Gestão de usuários e papéis.",
   },
   {
-    label: "Aliases",
+    // R-G05: "alias" só no código e no banco; o menu diz "Apelidos". A rota segue /configuracoes/aliases
+    // (lista consolidada só de leitura, E7 da CAD-001; só o Administrador).
+    label: "Apelidos",
     href: "/configuracoes/aliases",
     icon: "tags",
     section: "configuracoes",
     roles: ADMIN_ONLY,
-    available: false,
-    description: "Nomes alternativos usados no reconhecimento de comprovantes.",
+    available: true,
+    description: "Nomes, chaves e contas usados para reconhecer quem pagou e quem recebeu.",
   },
   {
     label: "Parâmetros do sistema",

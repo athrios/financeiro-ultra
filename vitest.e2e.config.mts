@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
 /**
- * Testes de integração e ponta a ponta por HTTP, sem navegador (E7 comprovantes; E8 acesso/CA-08).
+ * Testes de integração e ponta a ponta por HTTP, sem navegador (E7 comprovantes; E8 acesso/CA-08; CAD-001 E7 parte 2: sócios, recebedores, clientes e apelidos).
  * A CI (.github/workflows/ci.yml) roda exatamente este comando depois de subir o Supabase local e o `next start`.
  *
  * Rodam contra um `next start` já no ar e o Supabase local, com dados fictícios do

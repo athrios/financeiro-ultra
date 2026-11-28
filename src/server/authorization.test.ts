@@ -15,7 +15,7 @@ import {
 } from "./authorization";
 
 function profileOf(role: UserRole, partnerId: string | null = null): ActiveProfile {
-  return { userId: "u-1", email: "usuario@exemplo.com", fullName: "Usuário Exemplo", role, partnerId };
+  return { userId: "u-1", email: "usuario@example.com", fullName: "Usuário Exemplo", role, partnerId };
 }
 
 const active = (role: UserRole): SessionState => ({ status: "active", profile: profileOf(role) });
@@ -61,7 +61,7 @@ describe("matriz de visibilidade do menu (03-ui-ux.md, 2.3)", () => {
       "Clientes",
       "Sócios",
       "Usuários",
-      "Aliases",
+      "Apelidos",
       "Parâmetros do sistema",
     ]);
   });
@@ -91,11 +91,16 @@ describe("matriz de visibilidade do menu (03-ui-ux.md, 2.3)", () => {
     expect(findNavItemByHref("/configuracoes/socios")?.label).toBe("Sócios");
   });
 
-  it("todos os módulos são placeholders na FND e as rotas são únicas", () => {
-    const placeholders = NAV_ITEMS.filter((item) => !item.available).map((item) => item.href);
-    expect(placeholders).toHaveLength(NAV_ITEMS.length - 1);
-    expect(NAV_ITEMS.find((item) => item.available)?.href).toBe("/");
+  it("só o Dashboard, Clientes (E6a), Sócios (E5a) e Apelidos (E7) estão liberados; o resto é placeholder; rotas únicas", () => {
+    const available = NAV_ITEMS.filter((item) => item.available).map((item) => item.href);
+    expect(available).toEqual(["/", "/clientes", "/configuracoes/socios", "/configuracoes/aliases"]);
     expect(new Set(NAV_ITEMS.map((item) => item.href)).size).toBe(NAV_ITEMS.length);
+  });
+
+  it('o menu diz "Apelidos" (R-G05) e mantém a rota /configuracoes/aliases', () => {
+    const item = findNavItemByHref("/configuracoes/aliases");
+    expect(item?.label).toBe("Apelidos");
+    expect(NAV_ITEMS.map((i) => i.label)).not.toContain("Aliases");
   });
 
   it("activeNavHref escolhe o item mais específico", () => {
@@ -125,7 +130,7 @@ describe("decideAccess (regra única de acesso, J1)", () => {
 
   it("autenticado sem perfil ativo (sem perfil, sem papel ou inativo) cai sempre em no-access", () => {
     for (const reason of ["no-profile", "no-role", "inactive"] as const) {
-      const session: SessionState = { status: "no-access", email: "usuario@exemplo.com", reason };
+      const session: SessionState = { status: "no-access", email: "usuario@example.com", reason };
       expect(decideAccess(session, "/")).toEqual({ kind: "no-access", reason });
       expect(decideAccess(session, "/recebimentos")).toEqual({ kind: "no-access", reason });
     }

@@ -37,6 +37,86 @@ export type Database = {
                   Relationships: [
                     
                   ]
+                },"client_aliases": {
+                  Row: {
+                    "active": boolean,"alias": string,"alias_type": Database["public"]['Enums']["client_alias_type"],"client_id": string,"created_at": string,"id": string,"normalized_value": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "active"?: boolean,"alias": string,"alias_type": Database["public"]['Enums']["client_alias_type"],"client_id": string,"created_at"?: string,"id"?: string,"normalized_value": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "active"?: boolean,"alias"?: string,"alias_type"?: Database["public"]['Enums']["client_alias_type"],"client_id"?: string,"created_at"?: string,"id"?: string,"normalized_value"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "client_aliases_client_id_fkey"
+      columns: ["client_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"client_partners": {
+                  Row: {
+                    "active": boolean,"client_id": string,"created_at": string,"id": string,"partner_id": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "active"?: boolean,"client_id": string,"created_at"?: string,"id"?: string,"partner_id": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "active"?: boolean,"client_id"?: string,"created_at"?: string,"id"?: string,"partner_id"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "client_partners_client_id_fkey"
+      columns: ["client_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "client_partners_partner_id_fkey"
+      columns: ["partner_id"]
+isOneToOne: false
+      referencedRelation: "partners"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"clients": {
+                  Row: {
+                    "active": boolean,"created_at": string,"default_monthly_value": number,"document": string | null,"document_type": string | null,"id": string,"legal_name": string,"normalized_name": string,"normalized_trade_name": string | null,"notes": string | null,"trade_name": string | null,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "active"?: boolean,"created_at"?: string,"default_monthly_value": number,"document"?: string | null,"document_type"?: never,"id"?: string,"legal_name": string,"normalized_name"?: never,"normalized_trade_name"?: never,"notes"?: string | null,"trade_name"?: string | null,"updated_at"?: string
+                  }
+                  Update: {
+                    "active"?: boolean,"created_at"?: string,"default_monthly_value"?: number,"document"?: string | null,"document_type"?: never,"id"?: string,"legal_name"?: string,"normalized_name"?: never,"normalized_trade_name"?: never,"notes"?: string | null,"trade_name"?: string | null,"updated_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"partner_aliases": {
+                  Row: {
+                    "active": boolean,"alias": string,"created_at": string,"id": string,"normalized_value": string,"partner_id": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "active"?: boolean,"alias": string,"created_at"?: string,"id"?: string,"normalized_value"?: never,"partner_id": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "active"?: boolean,"alias"?: string,"created_at"?: string,"id"?: string,"normalized_value"?: never,"partner_id"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "partner_aliases_partner_id_fkey"
+      columns: ["partner_id"]
+isOneToOne: false
+      referencedRelation: "partners"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"partners": {
                   Row: {
                     "active": boolean,"created_at": string,"id": string,"name": string,"normalized_name": string,"updated_at": string
@@ -97,6 +177,46 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"receiver_identifiers": {
+                  Row: {
+                    "account_number": string | null,"active": boolean,"bank_name": string | null,"branch": string | null,"created_at": string,"id": string,"identifier_type": Database["public"]['Enums']["receiver_identifier_type"],"normalized_value": string,"receiver_id": string,"updated_at": string,"value": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "account_number"?: string | null,"active"?: boolean,"bank_name"?: string | null,"branch"?: string | null,"created_at"?: string,"id"?: string,"identifier_type": Database["public"]['Enums']["receiver_identifier_type"],"normalized_value": string,"receiver_id": string,"updated_at"?: string,"value"?: string | null
+                  }
+                  Update: {
+                    "account_number"?: string | null,"active"?: boolean,"bank_name"?: string | null,"branch"?: string | null,"created_at"?: string,"id"?: string,"identifier_type"?: Database["public"]['Enums']["receiver_identifier_type"],"normalized_value"?: string,"receiver_id"?: string,"updated_at"?: string,"value"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "receiver_identifiers_receiver_id_fkey"
+      columns: ["receiver_id"]
+isOneToOne: false
+      referencedRelation: "receivers"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"receivers": {
+                  Row: {
+                    "active": boolean,"created_at": string,"holder_name": string,"id": string,"normalized_holder_name": string,"partner_id": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "active"?: boolean,"created_at"?: string,"holder_name": string,"id"?: string,"normalized_holder_name"?: never,"partner_id": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "active"?: boolean,"created_at"?: string,"holder_name"?: string,"id"?: string,"normalized_holder_name"?: never,"partner_id"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "receivers_partner_id_fkey"
+      columns: ["partner_id"]
+isOneToOne: false
+      referencedRelation: "partners"
+      referencedColumns: ["id"]
+    }
+                  ]
                 }
           }
           Views: {
@@ -135,10 +255,124 @@ isOneToOne: false
 { Args: { "p_mime_type": string,"p_original_name": string,"p_sha256": string,"p_size_bytes": number }; Returns: {
               "deleted": boolean,"is_duplicate": boolean,"proof_file_id": string,"storage_path": string,"upload_status": Database["public"]['Enums']["proof_upload_status"]
             }[]
-                           }
+                           },
+"save_client":
+{ Args: { "p_acknowledged_duplicate_ids"?: (string)[],"p_aliases": Json,"p_client_id": string,"p_correlation_id"?: string,"p_default_monthly_value": string,"p_document": string,"p_expected_updated_at": string,"p_legal_name": string,"p_notes": string,"p_partner_ids": (string)[],"p_reason"?: string,"p_trade_name": string }; Returns: {
+              "active": boolean,
+"created_at": string,
+"default_monthly_value": number,
+"document": string | null,
+"document_type": string | null,
+"id": string,
+"legal_name": string,
+"normalized_name": string,
+"normalized_trade_name": string | null,
+"notes": string | null,
+"trade_name": string | null,
+"updated_at": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "clients"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"save_partner":
+{ Args: { "p_aliases": (string)[],"p_correlation_id"?: string,"p_expected_updated_at": string,"p_name": string,"p_partner_id": string,"p_reason"?: string }; Returns: {
+              "active": boolean,
+"created_at": string,
+"id": string,
+"name": string,
+"normalized_name": string,
+"updated_at": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "partners"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"save_receiver":
+{ Args: { "p_correlation_id"?: string,"p_expected_updated_at": string,"p_holder_name": string,"p_identifiers": Json,"p_partner_id": string,"p_reason"?: string,"p_receiver_id": string }; Returns: {
+              "active": boolean,
+"created_at": string,
+"holder_name": string,
+"id": string,
+"normalized_holder_name": string,
+"partner_id": string,
+"updated_at": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "receivers"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"search_aliases":
+{ Args: { "p_kind"?: string,"p_limit"?: number,"p_offset"?: number,"p_query"?: string,"p_status"?: string }; Returns: {
+              "active": boolean,"display_value": string,"item_id": string,"kind": string,"owner_active": boolean,"owner_id": string,"owner_kind": string,"owner_name": string,"partner_id": string,"partner_name": string,"total_count": number
+            }[]
+                           },
+"search_clients":
+{ Args: { "p_limit"?: number,"p_offset"?: number,"p_partner_id"?: string,"p_query"?: string,"p_status"?: string }; Returns: {
+              "active": boolean,"default_monthly_value": string,"document": string,"document_type": string,"id": string,"legal_name": string,"partner_count": number,"total_count": number,"trade_name": string,"updated_at": string
+            }[]
+                           },
+"set_client_active":
+{ Args: { "p_active": boolean,"p_client_id": string,"p_correlation_id"?: string,"p_expected_updated_at": string,"p_reason"?: string }; Returns: {
+              "active": boolean,
+"created_at": string,
+"default_monthly_value": number,
+"document": string | null,
+"document_type": string | null,
+"id": string,
+"legal_name": string,
+"normalized_name": string,
+"normalized_trade_name": string | null,
+"notes": string | null,
+"trade_name": string | null,
+"updated_at": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "clients"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"set_partner_active":
+{ Args: { "p_active": boolean,"p_confirmed_receiver_ids"?: (string)[],"p_correlation_id"?: string,"p_expected_updated_at": string,"p_partner_id": string,"p_reason"?: string }; Returns: {
+              "active": boolean,
+"created_at": string,
+"id": string,
+"name": string,
+"normalized_name": string,
+"updated_at": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "partners"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"set_receiver_active":
+{ Args: { "p_active": boolean,"p_correlation_id"?: string,"p_expected_updated_at": string,"p_reason"?: string,"p_receiver_id": string }; Returns: {
+              "active": boolean,
+"created_at": string,
+"holder_name": string,
+"id": string,
+"normalized_holder_name": string,
+"partner_id": string,
+"updated_at": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "receivers"
+        isOneToOne: true
+        isSetofReturn: false
+      } }
           }
           Enums: {
-            "app_role": "ADMINISTRATOR"|"OPERATOR"|"VIEWER"|"PARTNER","audit_kind": "ROW_CHANGE"|"EVENT","audit_source": "UI"|"IMPORT"|"SYSTEM"|"SCRIPT"|"DIRECT","proof_extraction_status": "NOT_REQUESTED"|"PENDING"|"PROCESSING"|"DONE"|"FAILED","proof_upload_status": "PENDING_UPLOAD"|"STORED"
+            "app_role": "ADMINISTRATOR"|"OPERATOR"|"VIEWER"|"PARTNER","audit_kind": "ROW_CHANGE"|"EVENT","audit_source": "UI"|"IMPORT"|"SYSTEM"|"SCRIPT"|"DIRECT","client_alias_type": "NAME"|"DOCUMENT","proof_extraction_status": "NOT_REQUESTED"|"PENDING"|"PROCESSING"|"DONE"|"FAILED","proof_upload_status": "PENDING_UPLOAD"|"STORED","receiver_identifier_type": "NAME_VARIANT"|"PIX_KEY"|"BANK_ACCOUNT"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -258,7 +492,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "app_role": ["ADMINISTRATOR", "OPERATOR", "VIEWER", "PARTNER"],"audit_kind": ["ROW_CHANGE", "EVENT"],"audit_source": ["UI", "IMPORT", "SYSTEM", "SCRIPT", "DIRECT"],"proof_extraction_status": ["NOT_REQUESTED", "PENDING", "PROCESSING", "DONE", "FAILED"],"proof_upload_status": ["PENDING_UPLOAD", "STORED"]
+            "app_role": ["ADMINISTRATOR", "OPERATOR", "VIEWER", "PARTNER"],"audit_kind": ["ROW_CHANGE", "EVENT"],"audit_source": ["UI", "IMPORT", "SYSTEM", "SCRIPT", "DIRECT"],"client_alias_type": ["NAME", "DOCUMENT"],"proof_extraction_status": ["NOT_REQUESTED", "PENDING", "PROCESSING", "DONE", "FAILED"],"proof_upload_status": ["PENDING_UPLOAD", "STORED"],"receiver_identifier_type": ["NAME_VARIANT", "PIX_KEY", "BANK_ACCOUNT"]
           }
         }
 } as const

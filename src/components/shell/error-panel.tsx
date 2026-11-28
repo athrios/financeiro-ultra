@@ -15,6 +15,9 @@ interface ErrorPanelProps {
   showDashboardLink?: boolean;
   /** Nível do título: h1 por padrão (o painel é a página). */
   headingLevel?: "h1" | "h2";
+  /** Título e texto próprios da região (ex.: "Não foi possível carregar os sócios."). */
+  title?: string;
+  description?: string;
 }
 
 function supportCode(error: unknown): string | null {
@@ -30,7 +33,14 @@ function supportCode(error: unknown): string | null {
  * de suporte" (digest do Next, que é o que o log do servidor registra). Nunca mostra mensagem
  * técnica, stack, SQLSTATE nem nome de tabela.
  */
-export function ErrorPanel({ error, retry, showDashboardLink = true, headingLevel = "h1" }: ErrorPanelProps) {
+export function ErrorPanel({
+  error,
+  retry,
+  showDashboardLink = true,
+  headingLevel = "h1",
+  title = "Algo deu errado",
+  description = "Não foi possível exibir esta página. Tente novamente.",
+}: ErrorPanelProps) {
   const code = supportCode(error);
   const Heading = headingLevel;
 
@@ -40,8 +50,8 @@ export function ErrorPanel({ error, retry, showDashboardLink = true, headingLeve
         <span aria-hidden="true" className="grid size-12 place-items-center rounded-full border border-danger-border bg-danger text-danger-foreground">
           <TriangleAlert className="size-6" />
         </span>
-        <Heading className="text-xl font-semibold">Algo deu errado</Heading>
-        <p className="text-sm text-muted-foreground">Não foi possível exibir esta página. Tente novamente.</p>
+        <Heading className="text-xl font-semibold">{title}</Heading>
+        <p className="text-sm text-muted-foreground">{description}</p>
         {code && (
           <p className="text-xs text-muted-foreground">
             Código de suporte: <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-foreground select-all">{code}</code>
